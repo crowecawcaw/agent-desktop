@@ -12,6 +12,7 @@ A CLI tool that annotates screenshots using [OmniParser](https://github.com/micr
 
 ```
 percept screenshot --output <path>                             # Take a screenshot, annotate with numbered blocks, save to path
+percept screenshot --output <path> --scale <factor>             # Take a screenshot scaled by the given factor
 percept screenshot --output <path> --no-annotations            # Take a screenshot without annotations
 percept click --block <id>                                     # Click the center of an annotated block
 percept click --block <id> --offset <x>,<y>                    # Click with pixel offset relative to block center
