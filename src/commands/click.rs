@@ -1,0 +1,59 @@
+use anyhow::{Context, Result};
+
+use crate::platform;
+use crate::state::PerceptState;
+
+pub fn run_click(block_id: u32, offset: Option<(i32, i32)>) -> Result<()> {
+    let state = PerceptState::load()?;
+    let block = state.get_block(block_id)?;
+
+    let (cx, cy) = block.bbox.center_pixels(state.image_width, state.image_height);
+    let (x, y) = match offset {
+        Some((ox, oy)) => (cx + ox, cy + oy),
+        None => (cx, cy),
+    };
+
+    platform::click_at(x, y).context(format!(
+        "Failed to click at ({}, {}). Is xdotool installed?",
+        x, y
+    ))?;
+
+    let label = if block.label.is_empty() {
+        "icon".to_string()
+    } else {
+        block.label.clone()
+    };
+    println!("Clicked block {} ({}) at ({}, {})", block_id, label, x, y);
+
+    Ok(())
+}
+
+/// Parse offset string like "10,20" into (i32, i32)
+pub fn parse_offset(s: &str) -> Result<(i32, i32)> {
+    let parts: Vec<&str> = s.split(',').collect();
+    if parts.len() != 2 {
+        anyhow::bail!("Offset must be in format 'x,y' (e.g., '10,20')");
+    }
+    let x = parts[0]
+        .trim()
+        .parse::<i32>()
+        .context("Invalid x offset")?;
+    let y = parts[1]
+        .trim()
+        .parse::<i32>()
+        .context("Invalid y offset")?;
+    Ok((x, y))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_offset() {
+        assert_eq!(parse_offset("10,20").unwrap(), (10, 20));
+        assert_eq!(parse_offset("-5, 15").unwrap(), (-5, 15));
+        assert!(parse_offset("invalid").is_err());
+        assert!(parse_offset("1,2,3").is_err());
+    }
+}
