@@ -24,9 +24,9 @@ enum Commands {
         #[arg(long)]
         output: String,
 
-        /// Scale factor for the screenshot
-        #[arg(long)]
-        scale: Option<f64>,
+        /// Scale factor for the screenshot (default: 0.5)
+        #[arg(long, default_value = "0.5")]
+        scale: f64,
 
         /// Take screenshot without annotations
         #[arg(long)]
@@ -40,9 +40,13 @@ enum Commands {
         #[arg(long, default_value = "0.7")]
         iou_threshold: f64,
 
-        /// Enable Florence-2 icon captioning
+        /// Keep only the top N highest-confidence boxes
         #[arg(long)]
-        captions: bool,
+        max_blocks: Option<u32>,
+
+        /// Print timing information
+        #[arg(long)]
+        debug: bool,
     },
 
     /// Click the center of an annotated block
@@ -83,14 +87,56 @@ enum Commands {
     },
 
     /// Download ONNX models for inference
-    Setup {
-        /// Also download Florence-2 models for icon captioning (~400MB)
-        #[arg(long)]
-        with_captions: bool,
-    },
+    Setup,
+}
+
+/// If ORT_DYLIB_PATH is not already set, search common locations for the
+/// ONNX Runtime dylib and set the env var so `ort` (load-dynamic) can find it.
+fn auto_detect_ort_dylib() {
+    if std::env::var("ORT_DYLIB_PATH").is_ok() {
+        return;
+    }
+
+    #[cfg(target_os = "macos")]
+    let dylib_name = "libonnxruntime.dylib";
+    #[cfg(target_os = "linux")]
+    let dylib_name = "libonnxruntime.so";
+    #[cfg(target_os = "windows")]
+    let dylib_name = "onnxruntime.dll";
+
+    // 1. Check the percept models directory (downloaded by `percept setup`)
+    if let Some(models_dir) = dirs::data_dir().map(|d| d.join("percept").join("models")) {
+        let candidate = models_dir.join(dylib_name);
+        if candidate.exists() {
+            unsafe { std::env::set_var("ORT_DYLIB_PATH", &candidate) };
+            return;
+        }
+    }
+
+    // 2. Common system paths
+    #[cfg(target_os = "macos")]
+    let system_paths = &[
+        "/opt/homebrew/lib/libonnxruntime.dylib",
+        "/usr/local/lib/libonnxruntime.dylib",
+    ];
+    #[cfg(target_os = "linux")]
+    let system_paths = &[
+        "/usr/lib/libonnxruntime.so",
+        "/usr/local/lib/libonnxruntime.so",
+    ];
+    #[cfg(target_os = "windows")]
+    let system_paths: &[&str] = &[];
+
+    for path in system_paths {
+        if std::path::Path::new(path).exists() {
+            unsafe { std::env::set_var("ORT_DYLIB_PATH", path) };
+            return;
+        }
+    }
 }
 
 fn main() -> Result<()> {
+    auto_detect_ort_dylib();
     let cli = Cli::parse();
 
     match cli.command {
@@ -100,7 +146,8 @@ fn main() -> Result<()> {
             no_annotations,
             box_threshold,
             iou_threshold,
-            captions,
+            max_blocks,
+            debug,
         } => {
             commands::screenshot::run_screenshot(
                 &output,
@@ -108,7 +155,8 @@ fn main() -> Result<()> {
                 no_annotations,
                 box_threshold,
                 iou_threshold,
-                captions,
+                max_blocks,
+                debug,
             )?;
         }
         Commands::Click { block, offset } => {
@@ -128,9 +176,9 @@ fn main() -> Result<()> {
         } => {
             commands::scroll::run_scroll(block, &direction, amount)?;
         }
-        Commands::Setup { with_captions } => {
+        Commands::Setup => {
             let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(commands::setup::run_setup(with_captions))?;
+            rt.block_on(commands::setup::run_setup())?;
         }
     }
 

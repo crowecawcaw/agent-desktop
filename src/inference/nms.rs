@@ -1,4 +1,4 @@
-use crate::types::{BoundingBox, Detection, MergedElement, OcrResult};
+use crate::types::{BoundingBox, Detection};
 
 /// Compute intersection-over-union between two bounding boxes
 pub fn iou(a: &BoundingBox, b: &BoundingBox) -> f64 {
@@ -45,81 +45,21 @@ pub fn nms(detections: &mut Vec<Detection>, iou_threshold: f64) {
     });
 }
 
-/// Merge YOLO detections with OCR results based on IOU overlap.
-///
-/// - YOLO box overlapping OCR box -> merge (keep YOLO box, attach OCR text, mark interactable)
-/// - YOLO box without OCR overlap -> "icon" (mark interactable, label empty)
-/// - OCR box without YOLO overlap -> text-only element (mark non-interactable)
-pub fn merge_detections(
-    yolo_detections: &[Detection],
-    ocr_results: &[OcrResult],
-    iou_threshold: f64,
-) -> Vec<MergedElement> {
-    let mut merged = Vec::new();
-    let mut ocr_matched = vec![false; ocr_results.len()];
-
-    for det in yolo_detections {
-        let mut best_ocr_idx = None;
-        let mut best_iou = 0.0;
-
-        for (i, ocr) in ocr_results.iter().enumerate() {
-            if ocr_matched[i] {
-                continue;
-            }
-            let overlap = iou(&det.bbox, &ocr.bbox);
-            if overlap > iou_threshold && overlap > best_iou {
-                best_iou = overlap;
-                best_ocr_idx = Some(i);
-            }
-        }
-
-        let label = if let Some(idx) = best_ocr_idx {
-            ocr_matched[idx] = true;
-            ocr_results[idx].text.clone()
-        } else {
-            String::new() // icon without text, may be captioned by Florence-2
-        };
-
-        merged.push(MergedElement {
-            bbox: det.bbox.clone(),
-            label,
-            interactable: true,
-            confidence: det.confidence,
-        });
-    }
-
-    // Add unmatched OCR results as non-interactable text elements
-    for (i, ocr) in ocr_results.iter().enumerate() {
-        if !ocr_matched[i] {
-            merged.push(MergedElement {
-                bbox: ocr.bbox.clone(),
-                label: ocr.text.clone(),
-                interactable: false,
-                confidence: ocr.confidence,
-            });
-        }
-    }
-
-    merged
+/// Sort detections by Z-order (Morton) curve so spatially close boxes get adjacent IDs.
+pub fn sort_by_spatial_locality(detections: &mut [Detection]) {
+    detections.sort_by_key(|d| morton(d.bbox.x1, d.bbox.y1));
 }
 
-/// Sort elements by position: top-to-bottom, then left-to-right
-pub fn sort_by_position(elements: &mut [MergedElement]) {
-    elements.sort_by(|a, b| {
-        let ay = a.bbox.y1;
-        let by = b.bbox.y1;
-        // Group into rows (elements within 2% vertical distance are same row)
-        let row_a = (ay * 50.0) as i32;
-        let row_b = (by * 50.0) as i32;
-        if row_a != row_b {
-            row_a.cmp(&row_b)
-        } else {
-            a.bbox
-                .x1
-                .partial_cmp(&b.bbox.x1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        }
-    });
+/// Compute Morton (Z-order) code by interleaving 16-bit x and y.
+fn morton(x: f64, y: f64) -> u64 {
+    let xi = (x.clamp(0.0, 1.0) * 65535.0) as u64;
+    let yi = (y.clamp(0.0, 1.0) * 65535.0) as u64;
+    let mut z = 0u64;
+    for i in 0..16 {
+        z |= ((xi >> i) & 1) << (2 * i + 1);
+        z |= ((yi >> i) & 1) << (2 * i);
+    }
+    z
 }
 
 #[cfg(test)]
@@ -144,8 +84,6 @@ mod tests {
     fn test_iou_partial_overlap() {
         let a = BoundingBox::new(0.0, 0.0, 0.5, 0.5);
         let b = BoundingBox::new(0.25, 0.25, 0.75, 0.75);
-        // Intersection: [0.25, 0.25] to [0.5, 0.5] = 0.25 * 0.25 = 0.0625
-        // Union: 0.25 + 0.25 - 0.0625 = 0.4375
         let expected = 0.0625 / 0.4375;
         assert!((iou(&a, &b) - expected).abs() < 1e-6);
     }
@@ -173,67 +111,26 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_detections() {
-        let yolo = vec![
-            Detection {
-                bbox: BoundingBox::new(0.1, 0.1, 0.3, 0.3),
-                confidence: 0.9,
-            },
-            Detection {
-                bbox: BoundingBox::new(0.5, 0.5, 0.7, 0.7),
-                confidence: 0.85,
-            },
+    fn test_sort_by_spatial_locality() {
+        let mut detections = vec![
+            Detection { bbox: BoundingBox::new(0.9, 0.9, 1.0, 1.0), confidence: 0.9 }, // bottom-right
+            Detection { bbox: BoundingBox::new(0.0, 0.0, 0.1, 0.1), confidence: 0.9 }, // top-left
+            Detection { bbox: BoundingBox::new(0.5, 0.5, 0.6, 0.6), confidence: 0.9 }, // center
         ];
-        let ocr = vec![
-            OcrResult {
-                bbox: BoundingBox::new(0.1, 0.1, 0.3, 0.3),
-                text: "OK".to_string(),
-                confidence: 0.95,
-            },
-            OcrResult {
-                bbox: BoundingBox::new(0.8, 0.8, 1.0, 1.0),
-                text: "Status bar".to_string(),
-                confidence: 0.9,
-            },
-        ];
-        let merged = merge_detections(&yolo, &ocr, 0.1);
-        // First YOLO box matches first OCR -> merged with text "OK"
-        // Second YOLO box has no OCR match -> icon
-        // Second OCR box unmatched -> non-interactable text
-        assert_eq!(merged.len(), 3);
-        assert_eq!(merged[0].label, "OK");
-        assert!(merged[0].interactable);
-        assert_eq!(merged[1].label, "");
-        assert!(merged[1].interactable);
-        assert_eq!(merged[2].label, "Status bar");
-        assert!(!merged[2].interactable);
+        sort_by_spatial_locality(&mut detections);
+        // top-left should be first (lowest Morton code), bottom-right last
+        assert!((detections[0].bbox.x1 - 0.0).abs() < 1e-6);
+        assert!((detections[2].bbox.x1 - 0.9).abs() < 1e-6);
     }
 
     #[test]
-    fn test_sort_by_position() {
-        let mut elements = vec![
-            MergedElement {
-                bbox: BoundingBox::new(0.5, 0.1, 0.6, 0.2),
-                label: "B".to_string(),
-                interactable: true,
-                confidence: 0.9,
-            },
-            MergedElement {
-                bbox: BoundingBox::new(0.1, 0.1, 0.2, 0.2),
-                label: "A".to_string(),
-                interactable: true,
-                confidence: 0.9,
-            },
-            MergedElement {
-                bbox: BoundingBox::new(0.1, 0.5, 0.2, 0.6),
-                label: "C".to_string(),
-                interactable: true,
-                confidence: 0.9,
-            },
-        ];
-        sort_by_position(&mut elements);
-        assert_eq!(elements[0].label, "A");
-        assert_eq!(elements[1].label, "B");
-        assert_eq!(elements[2].label, "C");
+    fn test_morton_nearby_boxes_have_close_codes() {
+        // Two adjacent boxes should have closer Morton codes than two distant boxes
+        let close_a = morton(0.5, 0.5);
+        let close_b = morton(0.51, 0.5);
+        let far = morton(0.9, 0.9);
+        let close_diff = close_a.abs_diff(close_b);
+        let far_diff = close_a.abs_diff(far);
+        assert!(close_diff < far_diff);
     }
 }

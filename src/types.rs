@@ -43,8 +43,6 @@ impl BoundingBox {
 pub struct Block {
     pub id: u32,
     pub bbox: BoundingBox,
-    pub label: String,       // OCR text or Florence-2 caption
-    pub interactable: bool,  // true if detected by YOLO
 }
 
 /// Result of running the annotation pipeline
@@ -54,27 +52,9 @@ pub struct AnnotationResult {
     pub annotated_image_path: PathBuf,
 }
 
-/// Raw detection from YOLO before merging
+/// Raw detection from YOLO before NMS
 #[derive(Debug, Clone)]
 pub struct Detection {
     pub bbox: BoundingBox,
-    pub confidence: f64,
-}
-
-/// Raw OCR result before merging
-#[derive(Debug, Clone)]
-pub struct OcrResult {
-    pub bbox: BoundingBox,
-    pub text: String,
-    pub confidence: f64,
-}
-
-/// Merged element from YOLO + OCR pipeline
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct MergedElement {
-    pub bbox: BoundingBox,
-    pub label: String,
-    pub interactable: bool,
     pub confidence: f64,
 }

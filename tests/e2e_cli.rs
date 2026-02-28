@@ -64,8 +64,7 @@ fn test_screenshot_help() {
         .success()
         .stdout(predicate::str::contains("--output"))
         .stdout(predicate::str::contains("--scale"))
-        .stdout(predicate::str::contains("--no-annotations"))
-        .stdout(predicate::str::contains("--captions"));
+        .stdout(predicate::str::contains("--no-annotations"));
 }
 
 #[test]
@@ -192,7 +191,7 @@ fn test_setup_help() {
         .args(["setup", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("--with-captions"));
+        .stdout(predicate::str::contains("setup"));
 }
 
 // =============================================================================
@@ -417,6 +416,7 @@ fn test_click_invalid_offset_format() {
 // =============================================================================
 
 #[test]
+#[cfg(not(target_os = "macos"))]
 fn test_screenshot_no_annotations_fails_without_screenshot_tool() {
     let tmp = TempDir::new().unwrap();
     let output = tmp.path().join("screen.png");

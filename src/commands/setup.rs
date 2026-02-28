@@ -5,54 +5,21 @@ use std::path::PathBuf;
 
 use crate::inference::models_dir;
 
-const MODEL_BASE_URL: &str =
-    "https://github.com/nicholaschenai/omniparser-onnx/releases/download/v0.1.0";
-
 struct ModelInfo {
     filename: &'static str,
+    url: &'static str,
     sha256: &'static str,
-    required: bool, // true = core, false = captions only
 }
 
 const MODELS: &[ModelInfo] = &[
     ModelInfo {
         filename: "icon_detect.onnx",
+        url: "https://huggingface.co/onnx-community/OmniParser-icon_detect/resolve/main/onnx/model.onnx",
         sha256: "",
-        required: true,
-    },
-    ModelInfo {
-        filename: "text_det.onnx",
-        sha256: "",
-        required: true,
-    },
-    ModelInfo {
-        filename: "text_rec.onnx",
-        sha256: "",
-        required: true,
-    },
-    ModelInfo {
-        filename: "rec_dictionary.txt",
-        sha256: "",
-        required: true,
-    },
-    ModelInfo {
-        filename: "florence2_encoder.onnx",
-        sha256: "",
-        required: false,
-    },
-    ModelInfo {
-        filename: "florence2_decoder.onnx",
-        sha256: "",
-        required: false,
-    },
-    ModelInfo {
-        filename: "tokenizer.json",
-        sha256: "",
-        required: false,
     },
 ];
 
-pub async fn run_setup(with_captions: bool) -> Result<()> {
+pub async fn run_setup() -> Result<()> {
     let dir = models_dir();
     std::fs::create_dir_all(&dir).context("Failed to create models directory")?;
 
@@ -61,17 +28,17 @@ pub async fn run_setup(with_captions: bool) -> Result<()> {
     let client = reqwest::Client::new();
 
     for model in MODELS {
-        if !model.required && !with_captions {
-            continue;
-        }
-
         let dest = dir.join(model.filename);
         if dest.exists() {
             println!("  {} (already exists, skipping)", model.filename);
             continue;
         }
 
-        let url = format!("{}/{}", MODEL_BASE_URL, model.filename);
+        if model.url.is_empty() {
+            println!("  {} (no URL configured, skipping)", model.filename);
+            continue;
+        }
+        let url = model.url.to_string();
         println!("  Downloading {}...", model.filename);
 
         download_file(&client, &url, &dest).await?;
@@ -81,6 +48,9 @@ pub async fn run_setup(with_captions: bool) -> Result<()> {
             verify_checksum(&dest, model.sha256)?;
         }
     }
+
+    // Download ONNX Runtime dylib if not already present
+    download_ort_runtime(&dir, &client).await?;
 
     println!("\nSetup complete! Models are ready.");
 
@@ -141,6 +111,59 @@ fn verify_checksum(path: &PathBuf, expected: &str) -> Result<()> {
             expected,
             result
         );
+    }
+
+    Ok(())
+}
+
+fn ort_dylib_filename() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "libonnxruntime.dylib",
+        "windows" => "onnxruntime.dll",
+        _ => "libonnxruntime.so",
+    }
+}
+
+/// Check whether the ONNX Runtime dylib is accessible, and guide the user if not.
+async fn download_ort_runtime(_dir: &PathBuf, _client: &reqwest::Client) -> Result<()> {
+    let dylib = ort_dylib_filename();
+
+    // Check if ORT_DYLIB_PATH is already set by the user
+    if let Ok(p) = std::env::var("ORT_DYLIB_PATH") {
+        if std::path::Path::new(&p).exists() {
+            println!("  ONNX Runtime: found via ORT_DYLIB_PATH ({}).", p);
+            return Ok(());
+        }
+    }
+
+    // Check common system locations
+    let system_paths: &[&str] = match std::env::consts::OS {
+        "macos" => &[
+            "/opt/homebrew/lib/libonnxruntime.dylib",
+            "/usr/local/lib/libonnxruntime.dylib",
+        ],
+        "linux" => &[
+            "/usr/lib/libonnxruntime.so",
+            "/usr/local/lib/libonnxruntime.so",
+            "/usr/lib/x86_64-linux-gnu/libonnxruntime.so",
+            "/usr/lib/aarch64-linux-gnu/libonnxruntime.so",
+        ],
+        _ => &[],
+    };
+
+    for path in system_paths {
+        if std::path::Path::new(path).exists() {
+            println!("  ONNX Runtime: found at {}.", path);
+            return Ok(());
+        }
+    }
+
+    // Not found — guide the user
+    println!("  ONNX Runtime ({}) not found on this system.", dylib);
+    match std::env::consts::OS {
+        "macos" => println!("  Install it with: brew install onnxruntime"),
+        "linux" => println!("  Install it with: apt install libonnxruntime-dev  (or equivalent)"),
+        _ => println!("  Download ONNX Runtime from https://github.com/microsoft/onnxruntime/releases"),
     }
 
     Ok(())

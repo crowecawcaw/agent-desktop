@@ -28,7 +28,8 @@ pub fn run_annotate(
     output_path: &Path,
     box_threshold: f32,
     iou_threshold: f64,
-    captions: bool,
+    max_blocks: Option<u32>,
+    debug: bool,
 ) -> Result<AnnotationResult> {
     let img = image::open(screenshot_path)
         .context(format!("Failed to open screenshot: {:?}", screenshot_path))?;
@@ -41,19 +42,21 @@ pub fn run_annotate(
         );
     }
 
-    let mut engine = InferenceEngine::new(&models_dir, captions)?;
-    let blocks = engine.parse(&img, box_threshold, iou_threshold)?;
+    let t_load = std::time::Instant::now();
+    let mut engine = InferenceEngine::new(&models_dir)?;
+    if debug { eprintln!("[timing] model load: {:.0}ms", t_load.elapsed().as_millis()); }
 
+    let blocks = engine.parse(&img, box_threshold, iou_threshold, max_blocks, debug)?;
+
+    let t_render = std::time::Instant::now();
     let annotated_path = render_annotations(&img, &blocks, output_path)?;
+    if debug { eprintln!("[timing] render boxes: {:.0}ms", t_render.elapsed().as_millis()); }
 
     // Save state
     let (w, h) = (img.width(), img.height());
     let mut state = PerceptState::new(blocks.clone(), w, h);
     state.screenshot_path = Some(screenshot_path.to_string_lossy().to_string());
     state.save()?;
-
-    // Print blocks to stdout
-    print_blocks(&blocks);
 
     Ok(AnnotationResult {
         blocks,
@@ -70,13 +73,8 @@ pub fn render_annotations(
     let mut canvas = img.to_rgb8();
     let (img_w, img_h) = (canvas.width(), canvas.height());
 
-    // Use a built-in monospace-style font
     let font_data = include_bytes!("../../assets/DejaVuSans.ttf");
-    let font = FontRef::try_from_slice(font_data)
-        .unwrap_or_else(|_| {
-            // Fallback: try to use a basic font
-            FontRef::try_from_slice(include_bytes!("../../assets/DejaVuSans.ttf")).unwrap()
-        });
+    let font = FontRef::try_from_slice(font_data).unwrap();
 
     let scale = PxScale::from(16.0);
 
@@ -114,7 +112,6 @@ pub fn render_annotations(
             let bg_rect = Rect::at(label_x, label_y).of_size(label_w as u32, label_h as u32);
             draw_filled_rect_mut(&mut canvas, bg_rect, color);
 
-            // Draw ID text in white on colored background
             draw_text_mut(
                 &mut canvas,
                 Rgb([255, 255, 255]),
@@ -139,17 +136,3 @@ pub fn render_annotations(
     Ok(output_path.to_path_buf())
 }
 
-fn print_blocks(blocks: &[Block]) {
-    for block in blocks {
-        let kind = if block.interactable {
-            "interactive"
-        } else {
-            "text"
-        };
-        if block.label.is_empty() {
-            println!("[{}] ({}) icon", block.id, kind);
-        } else {
-            println!("[{}] ({}) {}", block.id, kind, block.label);
-        }
-    }
-}

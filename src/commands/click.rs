@@ -18,12 +18,7 @@ pub fn run_click(block_id: u32, offset: Option<(i32, i32)>) -> Result<()> {
         x, y
     ))?;
 
-    let label = if block.label.is_empty() {
-        "icon".to_string()
-    } else {
-        block.label.clone()
-    };
-    println!("Clicked block {} ({}) at ({}, {})", block_id, label, x, y);
+    println!("Clicked block {} at ({}, {})", block_id, x, y);
 
     Ok(())
 }

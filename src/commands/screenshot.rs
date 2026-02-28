@@ -6,36 +6,33 @@ use crate::platform;
 
 pub fn run_screenshot(
     output_path: &str,
-    scale: Option<f64>,
+    scale: f64,
     no_annotations: bool,
     box_threshold: f32,
     iou_threshold: f64,
-    captions: bool,
+    max_blocks: Option<u32>,
+    debug: bool,
 ) -> Result<()> {
-    // Capture screenshot to a temp file first
+    // Capture screenshot to a temp file first.
     let temp_path = if no_annotations {
         output_path.to_string()
     } else {
-        let temp = tempfile::NamedTempFile::new().context("Failed to create temp file")?;
-        temp.path().to_string_lossy().to_string()
+        std::env::temp_dir()
+            .join(format!("percept_{}.png", std::process::id()))
+            .to_string_lossy()
+            .to_string()
     };
 
     platform::take_screenshot(&temp_path)?;
 
-    // Apply scaling if requested
-    if let Some(factor) = scale {
+    // Apply scaling
+    if (scale - 1.0).abs() > 1e-9 {
         let img = image::open(&temp_path).context("Failed to open captured screenshot")?;
         let (w, h) = (img.width(), img.height());
-        let new_w = (w as f64 * factor) as u32;
-        let new_h = (h as f64 * factor) as u32;
-        let resized = img.resize_exact(
-            new_w,
-            new_h,
-            image::imageops::FilterType::Lanczos3,
-        );
-        resized
-            .save(&temp_path)
-            .context("Failed to save scaled screenshot")?;
+        let new_w = (w as f64 * scale) as u32;
+        let new_h = (h as f64 * scale) as u32;
+        let resized = img.resize_exact(new_w, new_h, image::imageops::FilterType::Lanczos3);
+        resized.save(&temp_path).context("Failed to save scaled screenshot")?;
     }
 
     if no_annotations {
@@ -49,7 +46,8 @@ pub fn run_screenshot(
         Path::new(output_path),
         box_threshold,
         iou_threshold,
-        captions,
+        max_blocks,
+        debug,
     )?;
 
     println!(
@@ -58,7 +56,7 @@ pub fn run_screenshot(
         result.blocks.len()
     );
 
-    // Clean up temp file if different from output
+    // Clean up temp file
     if temp_path != output_path {
         let _ = std::fs::remove_file(&temp_path);
     }
