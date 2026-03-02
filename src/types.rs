@@ -58,3 +58,5 @@ pub struct Detection {
     pub bbox: BoundingBox,
     pub confidence: f64,
 }
+
+

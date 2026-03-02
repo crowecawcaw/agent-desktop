@@ -75,8 +75,7 @@ pub fn render_annotations(
 
     let font_data = include_bytes!("../../assets/DejaVuSans.ttf");
     let font = FontRef::try_from_slice(font_data).unwrap();
-
-    let scale = PxScale::from(16.0);
+    let font_scale = PxScale::from(16.0);
 
     for block in blocks {
         let color_idx = ((block.id - 1) as usize) % COLORS.len();
@@ -101,7 +100,7 @@ pub fn render_annotations(
             }
         }
 
-        // Draw ID label background
+        // Draw ID label
         let label = format!("{}", block.id);
         let label_w = (label.len() as i32 * 10 + 6).max(20);
         let label_h = 20;
@@ -111,16 +110,7 @@ pub fn render_annotations(
         if label_x >= 0 && label_y >= 0 {
             let bg_rect = Rect::at(label_x, label_y).of_size(label_w as u32, label_h as u32);
             draw_filled_rect_mut(&mut canvas, bg_rect, color);
-
-            draw_text_mut(
-                &mut canvas,
-                Rgb([255, 255, 255]),
-                label_x + 3,
-                label_y + 2,
-                scale,
-                &font,
-                &label,
-            );
+            draw_text_mut(&mut canvas, Rgb([255, 255, 255]), label_x + 3, label_y + 2, font_scale, &font, &label);
         }
     }
 

@@ -74,69 +74,6 @@ pub fn image_to_chw_tensor(img: &RgbImage) -> Result<Array4<f32>> {
     Ok(tensor)
 }
 
-/// Convert RGB image to CHW float32 tensor with ImageNet normalization
-pub fn image_to_chw_normalized(img: &RgbImage) -> Result<Array4<f32>> {
-    let mean = [0.485f32, 0.456, 0.406];
-    let std = [0.229f32, 0.224, 0.225];
-
-    let (w, h) = (img.width() as usize, img.height() as usize);
-    let mut tensor = Array4::<f32>::zeros((1, 3, h, w));
-
-    for y in 0..h {
-        for x in 0..w {
-            let pixel = img.get_pixel(x as u32, y as u32);
-            tensor[[0, 0, y, x]] = (pixel[0] as f32 / 255.0 - mean[0]) / std[0];
-            tensor[[0, 1, y, x]] = (pixel[1] as f32 / 255.0 - mean[1]) / std[1];
-            tensor[[0, 2, y, x]] = (pixel[2] as f32 / 255.0 - mean[2]) / std[2];
-        }
-    }
-
-    Ok(tensor)
-}
-
-/// Resize image maintaining aspect ratio with max side constraint
-pub fn resize_max_side(img: &DynamicImage, max_side: u32) -> (RgbImage, f64) {
-    let (w, h) = img.dimensions();
-    let scale = if w.max(h) > max_side {
-        max_side as f64 / w.max(h) as f64
-    } else {
-        1.0
-    };
-    let new_w = (w as f64 * scale) as u32;
-    let new_h = (h as f64 * scale) as u32;
-    // Round to multiples of 32 for PaddleOCR
-    let new_w = ((new_w + 31) / 32) * 32;
-    let new_h = ((new_h + 31) / 32) * 32;
-
-    let resized = img
-        .resize_exact(new_w, new_h, image::imageops::FilterType::Lanczos3)
-        .to_rgb8();
-    (resized, scale)
-}
-
-/// Resize and pad for OCR recognition (fixed height, variable width)
-pub fn resize_for_ocr_rec(crop: &RgbImage, target_height: u32, max_width: u32) -> RgbImage {
-    let (w, h) = (crop.width(), crop.height());
-    let scale = target_height as f64 / h as f64;
-    let new_w = ((w as f64 * scale) as u32).min(max_width);
-
-    let resized = image::imageops::resize(
-        crop,
-        new_w,
-        target_height,
-        image::imageops::FilterType::Lanczos3,
-    );
-
-    if new_w < max_width {
-        let mut padded =
-            RgbImage::from_pixel(max_width, target_height, image::Rgb([0, 0, 0]));
-        image::imageops::overlay(&mut padded, &resized, 0, 0);
-        padded
-    } else {
-        resized
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,13 +125,4 @@ mod tests {
         assert!((tensor[[0, 2, 0, 0]] - 0.0).abs() < 1e-6); // B=0
     }
 
-    #[test]
-    fn test_image_to_chw_normalized() {
-        let img = RgbImage::from_pixel(2, 2, image::Rgb([128, 128, 128]));
-        let tensor = image_to_chw_normalized(&img).unwrap();
-        assert_eq!(tensor.shape(), &[1, 3, 2, 2]);
-        // (128/255 - 0.485) / 0.229
-        let expected_r = (128.0 / 255.0 - 0.485) / 0.229;
-        assert!((tensor[[0, 0, 0, 0]] - expected_r).abs() < 1e-3);
-    }
 }
