@@ -1,0 +1,97 @@
+Third-Party Notices for percept
+================================
+
+This file contains attribution notices for third-party components
+used or distributed with percept.
+
+
+1. OmniParser (icon_detect.onnx)
+---------------------------------
+Source: https://github.com/microsoft/OmniParser
+License: CC BY 4.0 (Creative Commons Attribution 4.0 International)
+Copyright (c) Microsoft Corporation.
+
+The icon detection model (icon_detect.onnx) is a YOLOv8 model fine-tuned
+by Microsoft's OmniParser project. The base YOLOv8 architecture and
+pretrained weights are from Ultralytics (see below).
+
+
+2. Ultralytics YOLOv8
+-----------------------
+Source: https://github.com/ultralytics/ultralytics
+License: AGPL-3.0
+Copyright (c) Ultralytics.
+
+The icon detection model is built on YOLOv8, which is licensed under
+AGPL-3.0. This is the reason percept is licensed under AGPL-3.0.
+
+
+3. PaddleOCR
+-------------
+Source: https://github.com/PaddlePaddle/PaddleOCR
+License: Apache License 2.0
+Copyright (c) Baidu, Inc. and its affiliates.
+
+The text detection model (text_det.onnx) and text recognition model
+(text_rec.onnx) are derived from PaddleOCR.
+
+Licensed under the Apache License, Version 2.0. You may obtain a copy
+of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+
+4. Florence-2
+--------------
+Source: https://huggingface.co/microsoft/Florence-2-base
+License: MIT
+Copyright (c) Microsoft Corporation.
+
+The optional captioning models (florence2_encoder.onnx,
+florence2_decoder.onnx) are from Microsoft's Florence-2 project,
+fine-tuned by OmniParser.
+
+
+5. ONNX Runtime
+----------------
+Source: https://github.com/microsoft/onnxruntime
+License: MIT
+Copyright (c) Microsoft Corporation.
+
+Used as the inference runtime for all model execution.
+
+
+6. DejaVu Sans Font
+--------------------
+Source: https://dejavu-fonts.github.io/
+The DejaVu fonts are a font family based on the Bitstream Vera Fonts.
+
+Fonts are Copyright (c) 2003 by Bitstream, Inc. All Rights Reserved.
+Bitstream Vera is a trademark of Bitstream, Inc.
+DejaVu changes are in public domain.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the fonts accompanying this license ("Fonts") and associated
+documentation files (the "Font Software"), to reproduce and distribute
+the Font Software, including without limitation the rights to use,
+copy, merge, publish, distribute, and/or sell copies of the Font
+Software, and to permit persons to whom the Font Software is furnished
+to do so, subject to the following conditions:
+
+The above copyright and trademark notices and this permission notice
+shall be included in all copies of one or more of the Font Software
+typefaces.
+
+The Font Software may be modified, altered, or added to, and in
+particular the designs of glyphs or characters in the Fonts may be
+modified and additional glyphs or characters may be added to the
+Fonts, only if the fonts are renamed to names not containing either
+the words "Bitstream" or the word "Vera".
+
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL
+BITSTREAM OR THE GNOME FOUNDATION BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL,
+OR CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT
+SOFTWARE OR FROM OTHER DEALINGS IN THE FONT SOFTWARE.
