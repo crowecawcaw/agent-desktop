@@ -82,6 +82,14 @@ enum Commands {
         /// Scale factor for the screenshot (default: 0.5)
         #[arg(long, default_value = "0.5")]
         scale: f64,
+
+        /// Capture only the frontmost window of this app (by name)
+        #[arg(long)]
+        app: Option<String>,
+
+        /// Capture only the frontmost window of this app (by PID)
+        #[arg(long)]
+        pid: Option<u32>,
     },
 
     /// Click an accessibility element
@@ -158,8 +166,8 @@ fn main() -> Result<()> {
         } => {
             commands::interact::run_interact(element, &action, value.as_deref())?;
         }
-        Commands::Screenshot { output, scale } => {
-            commands::screenshot::run_screenshot(&output, scale)?;
+        Commands::Screenshot { output, scale, app, pid } => {
+            commands::screenshot::run_screenshot(&output, scale, app.as_deref(), pid)?;
         }
         Commands::Click {
             element,

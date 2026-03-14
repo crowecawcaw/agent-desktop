@@ -2,8 +2,12 @@ use anyhow::{Context, Result};
 
 use crate::platform;
 
-pub fn run_screenshot(output_path: &str, scale: f64) -> Result<()> {
-    platform::take_screenshot(output_path)?;
+pub fn run_screenshot(output_path: &str, scale: f64, app: Option<&str>, pid: Option<u32>) -> Result<()> {
+    if app.is_some() || pid.is_some() {
+        platform::take_screenshot_window(output_path, app, pid)?;
+    } else {
+        platform::take_screenshot(output_path)?;
+    }
 
     if (scale - 1.0).abs() > 1e-9 {
         let img = image::open(output_path).context("Failed to open captured screenshot")?;

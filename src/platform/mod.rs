@@ -28,6 +28,13 @@ pub fn take_screenshot(output_path: &str) -> Result<()> {
     }
 }
 
+pub fn take_screenshot_window(output_path: &str, app: Option<&str>, pid: Option<u32>) -> Result<()> {
+    match Platform::detect()? {
+        Platform::Linux => anyhow::bail!("Window screenshot is not yet supported on Linux"),
+        Platform::MacOS => macos::take_screenshot_window(output_path, app, pid),
+    }
+}
+
 pub fn click_at(x: i32, y: i32) -> Result<()> {
     match Platform::detect()? {
         Platform::Linux => linux::click_at(x, y),
