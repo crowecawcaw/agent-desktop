@@ -19,6 +19,7 @@ type AXError = i32;
 const K_AX_ERROR_SUCCESS: AXError = 0;
 const K_AX_ERROR_API_DISABLED: AXError = -25211;
 
+#[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
     fn AXUIElementCreateSystemWide() -> AXUIElementRef;
     fn AXUIElementCreateApplication(pid: i32) -> AXUIElementRef;
@@ -27,7 +28,7 @@ extern "C" {
         attribute: *const c_void, // CFStringRef
         value: *mut *const c_void,
     ) -> AXError;
-    fn AXUIElementCopyAttributeNames(
+    fn AXUIElementCopyActionNames(
         element: AXUIElementRef,
         names: *mut *const c_void,
     ) -> AXError;
@@ -127,6 +128,27 @@ impl MacOSAccessibilityProvider {
         (1920, 1080)
     }
 
+    fn get_all_app_pids() -> Vec<i32> {
+        let output = std::process::Command::new("osascript")
+            .args([
+                "-e",
+                r#"tell application "System Events" to get unix id of every process whose background only is false"#,
+            ])
+            .output();
+        match output {
+            Ok(out) if out.status.success() => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                // Output is like "1234, 5678, 9012\n"
+                stdout
+                    .trim()
+                    .split(", ")
+                    .filter_map(|s| s.trim().parse::<i32>().ok())
+                    .collect()
+            }
+            _ => Vec::new(),
+        }
+    }
+
     fn get_focused_pid() -> Result<i32> {
         let output = std::process::Command::new("osascript")
             .args([
@@ -185,6 +207,55 @@ impl super::AccessibilityProvider for MacOSAccessibilityProvider {
             screen_height: screen_h,
             element_count,
             elements,
+            query_max_depth: opts.max_depth,
+            query_max_elements: opts.max_elements,
+            query_visible_only: opts.visible_only,
+            query_roles: opts.roles.as_ref()
+                .map(|r| r.iter().map(|role| role.display_name().to_string()).collect())
+                .unwrap_or_default(),
+        })
+    }
+
+    fn get_all_apps_tree(&self, opts: &QueryOptions) -> Result<AccessibilitySnapshot> {
+        let pids = Self::get_all_app_pids();
+        let (screen_w, screen_h) = Self::get_screen_size();
+        let mut elements = Vec::new();
+        let mut id_counter = 0u32;
+        let mut cache = self.element_cache.lock().unwrap();
+        cache.clear();
+
+        for pid in pids {
+            if elements.len() >= opts.max_elements as usize {
+                break;
+            }
+            let app_elem = unsafe { AXUIElementCreateApplication(pid) };
+            if app_elem.is_null() {
+                continue;
+            }
+            let app_name = get_string_attr(app_elem, "AXTitle")
+                .unwrap_or_else(|| format!("pid:{}", pid));
+
+            traverse_ax_tree(
+                app_elem, opts, &mut elements, &mut id_counter,
+                0, None, screen_w, screen_h, &app_name, &mut cache,
+            );
+            unsafe { CFRelease(app_elem) };
+        }
+
+        let element_count = elements.len();
+        Ok(AccessibilitySnapshot {
+            app_name: "all".to_string(),
+            pid: 0,
+            screen_width: screen_w,
+            screen_height: screen_h,
+            element_count,
+            elements,
+            query_max_depth: opts.max_depth,
+            query_max_elements: opts.max_elements,
+            query_visible_only: opts.visible_only,
+            query_roles: opts.roles.as_ref()
+                .map(|r| r.iter().map(|role| role.display_name().to_string()).collect())
+                .unwrap_or_default(),
         })
     }
 
@@ -248,6 +319,12 @@ impl super::AccessibilityProvider for MacOSAccessibilityProvider {
             screen_height: screen_h,
             element_count,
             elements,
+            query_max_depth: opts.max_depth,
+            query_max_elements: opts.max_elements,
+            query_visible_only: opts.visible_only,
+            query_roles: opts.roles.as_ref()
+                .map(|r| r.iter().map(|role| role.display_name().to_string()).collect())
+                .unwrap_or_default(),
         })
     }
 
@@ -468,7 +545,11 @@ fn get_children(element: AXUIElementRef) -> Vec<AXUIElementRef> {
     let array: CFArray = unsafe { TCFType::wrap_under_create_rule(value as *const _) };
     let mut children = Vec::new();
     for i in 0..array.len() {
-        let child = unsafe { *array.get(i).as_ptr() as AXUIElementRef };
+        let item = match array.get(i) {
+            Some(item) => item,
+            None => continue,
+        };
+        let child = *item as AXUIElementRef;
         if !child.is_null() {
             unsafe { CFRetain(child) };
             children.push(child);
@@ -478,71 +559,49 @@ fn get_children(element: AXUIElementRef) -> Vec<AXUIElementRef> {
 }
 
 fn get_actions(element: AXUIElementRef) -> Vec<String> {
-    let mut names: *const c_void = std::ptr::null();
-    let err = unsafe { AXUIElementCopyAttributeNames(element, &mut names) };
-    if err != K_AX_ERROR_SUCCESS || names.is_null() {
+    // Query the real AX action names from the element.
+    let mut names_ptr: *const c_void = std::ptr::null();
+    let err = unsafe { AXUIElementCopyActionNames(element, &mut names_ptr) };
+    if err != K_AX_ERROR_SUCCESS || names_ptr.is_null() {
         return Vec::new();
     }
-    // We need AXUIElementCopyActionNames instead
-    unsafe { CFRelease(names) };
 
-    // Try common actions and see which ones the element supports
-    let possible_actions = [
-        ("AXPress", "press"),
-        ("AXShowMenu", "show_menu"),
-        ("AXRaise", "raise"),
-        ("AXConfirm", "confirm"),
-        ("AXCancel", "cancel"),
-        ("AXIncrement", "increment"),
-        ("AXDecrement", "decrement"),
-    ];
-
+    let array: CFArray = unsafe { TCFType::wrap_under_create_rule(names_ptr as *const _) };
     let mut actions = Vec::new();
-    // Check if element has AXValue attribute (means set-value is possible)
-    if get_string_attr(element, "AXValue").is_some() {
-        // Only for text fields
-        let role = get_string_attr(element, "AXRole").unwrap_or_default();
-        if role.contains("TextField") || role.contains("TextArea") {
-            actions.push("set_value".to_string());
-        }
-    }
 
-    for (ax_action, normalized) in &possible_actions {
-        let cf_action = CFString::new(ax_action);
-        let err = unsafe {
-            AXUIElementPerformAction(element, cf_action.as_concrete_TypeRef() as *const c_void)
+    for i in 0..array.len() {
+        let item = match array.get(i) {
+            Some(item) => item,
+            None => continue,
         };
-        // We can't really test without performing — so we'll just add common ones based on role
-        let _ = err;
-        let _ = normalized;
+        let ptr = *item as *const c_void;
+        if ptr.is_null() {
+            continue;
+        }
+        // Items are owned by the array; use get_rule to avoid double-release.
+        let s: CFString = unsafe { TCFType::wrap_under_get_rule(ptr as *const _) };
+        let ax_name = s.to_string();
+        let normalized = match ax_name.as_str() {
+            "AXPress" => "press",
+            "AXShowMenu" => "show_menu",
+            "AXRaise" => "raise",
+            "AXConfirm" => "confirm",
+            "AXCancel" => "cancel",
+            "AXIncrement" => "increment",
+            "AXDecrement" => "decrement",
+            other => other,
+        };
+        if !actions.contains(&normalized.to_string()) {
+            actions.push(normalized.to_string());
+        }
     }
 
-    // Instead, derive actions from the role
+    // AXSetValue is not reported as an action but is available on text fields.
     let role = get_string_attr(element, "AXRole").unwrap_or_default();
-    match role.as_str() {
-        "AXButton" => actions.push("press".to_string()),
-        "AXCheckBox" => {
-            actions.push("press".to_string());
-            actions.push("toggle".to_string());
-        }
-        "AXRadioButton" => actions.push("press".to_string()),
-        "AXTextField" | "AXTextArea" => {
-            actions.push("focus".to_string());
+    if matches!(role.as_str(), "AXTextField" | "AXTextArea") {
+        if !actions.contains(&"set_value".to_string()) {
             actions.push("set_value".to_string());
         }
-        "AXMenuItem" => actions.push("press".to_string()),
-        "AXPopUpButton" | "AXComboBox" => {
-            actions.push("press".to_string());
-            actions.push("expand".to_string());
-        }
-        "AXLink" => actions.push("press".to_string()),
-        "AXSlider" => {
-            actions.push("set_value".to_string());
-            actions.push("increment".to_string());
-            actions.push("decrement".to_string());
-        }
-        "AXWindow" => actions.push("raise".to_string()),
-        _ => {}
     }
 
     actions

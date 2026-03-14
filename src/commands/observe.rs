@@ -7,32 +7,36 @@ use crate::types::*;
 pub fn run_observe(
     app: Option<&str>,
     pid: Option<u32>,
-    max_depth: u32,
+    max_depth: Option<u32>,
     max_elements: u32,
     role_filter: Option<&str>,
     visible_only: bool,
     format: &str,
     include_raw: bool,
 ) -> Result<()> {
-    let target = if let Some(pid) = pid {
-        AppTarget::ByPid(pid)
-    } else if let Some(name) = app {
-        AppTarget::ByName(name.to_string())
-    } else {
-        AppTarget::Focused
-    };
+    let all_apps = app.is_none() && pid.is_none();
+    let effective_depth = max_depth.unwrap_or(if all_apps { 1 } else { 10 });
 
     let roles = role_filter.map(ElementRole::parse_filter);
 
     let opts = QueryOptions {
-        max_depth,
+        max_depth: effective_depth,
         max_elements,
         visible_only,
         roles,
         include_raw,
     };
 
-    let snapshot = accessibility::get_tree(&target, &opts)?;
+    let snapshot = if all_apps {
+        accessibility::get_all_apps_overview(&opts)?
+    } else {
+        let target = if let Some(p) = pid {
+            AppTarget::ByPid(p)
+        } else {
+            AppTarget::ByName(app.unwrap().to_string())
+        };
+        accessibility::get_tree(&target, &opts)?
+    };
 
     // Save state for subsequent interact/click commands
     let state = PerceptState::from_accessibility(snapshot.clone());
@@ -50,7 +54,11 @@ pub fn run_observe(
 }
 
 fn print_tree(snapshot: &AccessibilitySnapshot) {
-    println!("{} (pid: {})", snapshot.app_name, snapshot.pid);
+    if snapshot.pid == 0 {
+        println!("All applications ({} elements)", snapshot.element_count);
+    } else {
+        println!("{} (pid: {})", snapshot.app_name, snapshot.pid);
+    }
 
     // Build a map of parent -> children for rendering
     let root_elements: Vec<&AccessibilityElement> = snapshot

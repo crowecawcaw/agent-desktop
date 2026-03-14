@@ -82,11 +82,11 @@ pub fn render_annotations(
         let (r, g, b) = COLORS[color_idx];
         let color = Rgb([r, g, b]);
 
-        // Convert normalized coordinates to pixel coordinates
-        let x1 = (block.bbox.x1 * img_w as f64) as i32;
-        let y1 = (block.bbox.y1 * img_h as f64) as i32;
-        let x2 = (block.bbox.x2 * img_w as f64) as i32;
-        let y2 = (block.bbox.y2 * img_h as f64) as i32;
+        // Convert normalized coordinates to pixel coordinates, clamped to image bounds.
+        let x1 = ((block.bbox.x1 * img_w as f64) as i32).clamp(0, img_w as i32);
+        let y1 = ((block.bbox.y1 * img_h as f64) as i32).clamp(0, img_h as i32);
+        let x2 = ((block.bbox.x2 * img_w as f64) as i32).clamp(0, img_w as i32);
+        let y2 = ((block.bbox.y2 * img_h as f64) as i32).clamp(0, img_h as i32);
         let w = (x2 - x1).max(1);
         let h = (y2 - y1).max(1);
 
@@ -161,15 +161,15 @@ pub fn render_accessibility_annotations(
         let (r, g, b) = A11Y_COLORS[color_idx];
         let color = Rgb([r, g, b]);
 
-        let x1 = (bbox.x1 * img_w as f64) as i32;
-        let y1 = (bbox.y1 * img_h as f64) as i32;
-        let x2 = (bbox.x2 * img_w as f64) as i32;
-        let y2 = (bbox.y2 * img_h as f64) as i32;
+        let x1 = ((bbox.x1 * img_w as f64) as i32).clamp(0, img_w as i32);
+        let y1 = ((bbox.y1 * img_h as f64) as i32).clamp(0, img_h as i32);
+        let x2 = ((bbox.x2 * img_w as f64) as i32).clamp(0, img_w as i32);
+        let y2 = ((bbox.y2 * img_h as f64) as i32).clamp(0, img_h as i32);
         let w = (x2 - x1).max(1);
         let h = (y2 - y1).max(1);
 
         // Draw a dashed-style box (1px, to distinguish from YOLO's 2px solid)
-        if x1 >= 0 && y1 >= 0 && w > 0 && h > 0 {
+        if w > 0 && h > 0 {
             let rect = Rect::at(x1, y1).of_size(w as u32, h as u32);
             draw_hollow_rect_mut(&mut canvas, rect, color);
         }

@@ -131,7 +131,7 @@ impl PerceptState {
                     .map(|a| a.element_count)
                     .unwrap_or(0);
                 anyhow::anyhow!(
-                    "Element {} not found. Available elements: 1-{}",
+                    "Element {} not found in accessibility state ({} elements total).",
                     id,
                     count
                 )
@@ -184,6 +184,10 @@ mod tests {
             screen_height: 1080,
             element_count: 0,
             elements: Vec::new(),
+            query_max_depth: 10,
+            query_max_elements: 500,
+            query_visible_only: true,
+            query_roles: Vec::new(),
         };
         let state = PerceptState::from_accessibility(snapshot);
         assert_eq!(state.source, StateSource::Accessibility);

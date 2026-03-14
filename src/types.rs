@@ -267,7 +267,23 @@ pub struct AccessibilitySnapshot {
     pub screen_height: u32,
     pub element_count: usize,
     pub elements: Vec<AccessibilityElement>,
+    /// Query options used to build this snapshot — stored so `interact` can
+    /// re-traverse with identical settings and get the same element IDs.
+    #[serde(default = "default_query_max_depth")]
+    pub query_max_depth: u32,
+    #[serde(default = "default_query_max_elements")]
+    pub query_max_elements: u32,
+    #[serde(default = "default_query_visible_only")]
+    pub query_visible_only: bool,
+    /// Role filter used during observe, as display names (e.g. ["button", "text_field"]).
+    /// Empty means no filter was applied.
+    #[serde(default)]
+    pub query_roles: Vec<String>,
 }
+
+fn default_query_max_depth() -> u32 { 10 }
+fn default_query_max_elements() -> u32 { 500 }
+fn default_query_visible_only() -> bool { true }
 
 /// Options for querying the accessibility tree
 #[derive(Debug, Clone)]

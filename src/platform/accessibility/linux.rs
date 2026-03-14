@@ -210,6 +210,12 @@ async fn get_focused_tree_async(
         screen_height: screen_h,
         element_count,
         elements,
+        query_max_depth: opts.max_depth,
+        query_max_elements: opts.max_elements,
+        query_visible_only: opts.visible_only,
+        query_roles: opts.roles.as_ref()
+            .map(|r| r.iter().map(|role| role.display_name().to_string()).collect())
+            .unwrap_or_default(),
     })
 }
 
@@ -297,6 +303,12 @@ async fn get_app_tree_async(
         screen_height: screen_h,
         element_count,
         elements,
+        query_max_depth: opts.max_depth,
+        query_max_elements: opts.max_elements,
+        query_visible_only: opts.visible_only,
+        query_roles: opts.roles.as_ref()
+            .map(|r| r.iter().map(|role| role.display_name().to_string()).collect())
+            .unwrap_or_default(),
     })
 }
 

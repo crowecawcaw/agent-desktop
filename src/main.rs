@@ -9,8 +9,8 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "percept")]
-#[command(about = "CLI tool for AI agents to observe and interact with desktop UIs via accessibility APIs and annotated screenshots")]
-#[command(version)]
+#[command(about = concat!("v", env!("CARGO_PKG_VERSION"), " — CLI tool for AI agents to observe and interact with desktop UIs via accessibility APIs and annotated screenshots"))]
+#[command(disable_version_flag = true)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -18,19 +18,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Query the accessibility tree of the focused or specified application (primary command)
+    /// Query the accessibility tree. Without --app/--pid shows all apps at depth 1 (overview). With --app/--pid shows full tree for that app.
     Observe {
-        /// Target application by name
+        /// Target application by name (shows full tree)
         #[arg(long)]
         app: Option<String>,
 
-        /// Target application by PID
+        /// Target application by PID (shows full tree)
         #[arg(long)]
         pid: Option<u32>,
 
-        /// Maximum tree depth to traverse (default: 10)
-        #[arg(long, default_value = "10")]
-        max_depth: u32,
+        /// Maximum tree depth (default: 1 for all-apps overview, 10 for a specific app)
+        #[arg(long)]
+        max_depth: Option<u32>,
 
         /// Maximum number of elements to return (default: 500)
         #[arg(long, default_value = "500")]
@@ -230,7 +230,7 @@ fn main() -> Result<()> {
                 max_depth,
                 max_elements,
                 role.as_deref(),
-                !include_hidden, // visible_only = !include_hidden
+                !include_hidden,
                 &format,
                 raw,
             )?;
