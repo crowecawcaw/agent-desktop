@@ -5,3 +5,4 @@ pub mod observe;
 pub mod screenshot;
 pub mod scroll;
 pub mod type_text;
+pub mod wait;

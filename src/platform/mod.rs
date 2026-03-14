@@ -63,6 +63,13 @@ pub fn scroll(direction: &str, amount: u32) -> Result<()> {
     }
 }
 
+pub fn focus_app(app: Option<&str>, pid: Option<u32>) -> Result<()> {
+    match Platform::detect()? {
+        Platform::Linux => linux::focus_app(app, pid),
+        Platform::MacOS => macos::focus_app(app, pid),
+    }
+}
+
 pub fn key_press(name: &str, modifiers: &[&str]) -> Result<()> {
     match Platform::detect()? {
         Platform::Linux => linux::key_press(name, modifiers),

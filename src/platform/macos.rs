@@ -309,6 +309,35 @@ pub fn key_press(name: &str, modifiers: &[&str]) -> Result<()> {
     Ok(())
 }
 
+pub fn focus_app(app: Option<&str>, pid: Option<u32>) -> Result<()> {
+    let script = if let Some(name) = app {
+        format!(
+            r#"tell application "{}" to activate"#,
+            name
+        )
+    } else if let Some(p) = pid {
+        format!(
+            r#"tell application "System Events"
+    set frontmost of (first process whose unix id is {}) to true
+end tell"#,
+            p
+        )
+    } else {
+        unreachable!()
+    };
+    let output = Command::new("osascript")
+        .args(["-e", &script])
+        .output()
+        .context("Failed to focus app")?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("Failed to focus app: {}", stderr);
+    }
+    // Brief pause to let the app come to front
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    Ok(())
+}
+
 pub fn scroll(direction: &str, amount: u32) -> Result<()> {
     let (dx, dy) = match direction {
         "up" => (0, amount as i32),

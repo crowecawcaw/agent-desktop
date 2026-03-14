@@ -111,6 +111,18 @@ pub fn key_press(name: &str, modifiers: &[&str]) -> Result<()> {
         .context("Failed to press key. Is xdotool installed?")
 }
 
+pub fn focus_app(app: Option<&str>, pid: Option<u32>) -> Result<()> {
+    if let Some(name) = app {
+        run_command("xdotool", &["search", "--name", name, "windowactivate"])
+            .context("Failed to focus app. Is xdotool installed?")?;
+    } else if let Some(p) = pid {
+        let pid_str = p.to_string();
+        run_command("xdotool", &["search", "--pid", &pid_str, "windowactivate"])
+            .context("Failed to focus app. Is xdotool installed?")?;
+    }
+    Ok(())
+}
+
 pub fn scroll(direction: &str, amount: u32) -> Result<()> {
     let button = match direction {
         "up" => "4",

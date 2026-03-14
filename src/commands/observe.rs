@@ -81,6 +81,77 @@ pub fn run_observe(
     Ok(())
 }
 
+/// Run observe silently (no output) — used by action commands with --app/--pid
+/// to auto-populate state before performing actions.
+pub fn run_observe_silent(app: Option<&str>, pid: Option<u32>) -> Result<()> {
+    let opts = QueryOptions {
+        max_depth: 10,
+        max_elements: 500,
+        visible_only: true,
+        roles: None,
+        include_raw: false,
+    };
+
+    let target = if let Some(p) = pid {
+        AppTarget::ByPid(p)
+    } else if let Some(name) = app {
+        AppTarget::ByName(name.to_string())
+    } else {
+        anyhow::bail!("No app target specified");
+    };
+
+    let snapshot = accessibility::get_tree(&target, &opts)?;
+    let state = PerceptState::from_accessibility(snapshot);
+    state.save()?;
+    Ok(())
+}
+
+/// Show a specific element and its subtree from the last observe state.
+pub fn run_observe_element(element_id: u32, format: &str) -> Result<()> {
+    let state = PerceptState::load()?;
+    let snapshot = state.accessibility.as_ref().ok_or_else(|| {
+        anyhow::anyhow!("No accessibility data. Run `percept observe` first.")
+    })?;
+
+    // Collect element and all descendants
+    let mut ids_to_show = vec![element_id];
+    let mut i = 0;
+    while i < ids_to_show.len() {
+        let id = ids_to_show[i];
+        if let Some(elem) = snapshot.elements.iter().find(|e| e.id == id) {
+            for child_id in &elem.children {
+                ids_to_show.push(*child_id);
+            }
+        }
+        i += 1;
+    }
+
+    let subtree: Vec<&AccessibilityElement> = snapshot
+        .elements
+        .iter()
+        .filter(|e| ids_to_show.contains(&e.id))
+        .collect();
+
+    if subtree.is_empty() {
+        anyhow::bail!("Element {} not found in last observe state", element_id);
+    }
+
+    match format {
+        "tree" => {
+            println!("Element {} subtree ({} elements):", element_id, subtree.len());
+            if let Some(root) = snapshot.elements.iter().find(|e| e.id == element_id) {
+                print_tree_node(root, &snapshot.elements, "", true);
+            }
+        }
+        _ => {
+            let json = serde_json::to_string_pretty(&subtree)?;
+            println!("{}", json);
+        }
+    }
+
+    Ok(())
+}
+
 fn print_element_summary(elem: &AccessibilityElement) {
     let mut line = format!("[{}] {}", elem.id, elem.role_name);
     if let Some(ref name) = elem.name {

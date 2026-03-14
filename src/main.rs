@@ -14,9 +14,10 @@ use clap::{Parser, Subcommand};
 
   percept observe --app Safari
   percept observe --app Safari --query 'text_field[name*=\"Address\"]'
-  percept click --query 'toolbar > text_field[name*=\"Address\"]'
+  percept click --app Safari --query 'toolbar > text_field[name*=\"Address\"]'
   percept type --text \"https://example.com\"
-  percept key --name return"))]
+  percept key --name cmd+n
+  percept wait --app Safari --query 'text_field[value*=\"loaded\"]' --timeout 5"))]
 #[command(disable_version_flag = true)]
 struct Cli {
     #[command(subcommand)]
@@ -51,6 +52,10 @@ enum Commands {
         #[arg(long, short)]
         query: Option<String>,
 
+        /// Show a specific element and its subtree (by ID from last observe)
+        #[arg(long)]
+        element: Option<u32>,
+
         /// Include hidden/offscreen elements
         #[arg(long)]
         include_hidden: bool,
@@ -73,6 +78,14 @@ enum Commands {
         /// CSS-like query to select element (e.g. 'button[name="Submit"]')
         #[arg(long, short)]
         query: Option<String>,
+
+        /// Target application by name (runs observe automatically)
+        #[arg(long)]
+        app: Option<String>,
+
+        /// Target application by PID (runs observe automatically)
+        #[arg(long)]
+        pid: Option<u32>,
 
         /// Action to perform (press, set-value, focus, toggle, expand, collapse, select, show-menu)
         #[arg(long)]
@@ -102,15 +115,31 @@ enum Commands {
         pid: Option<u32>,
     },
 
-    /// Click an accessibility element
+    /// Click an accessibility element or screen coordinate
     Click {
         /// Element ID to click (from accessibility tree)
-        #[arg(long, required_unless_present = "query")]
+        #[arg(long)]
         element: Option<u32>,
 
         /// CSS-like query to select element (e.g. 'button[name="Submit"]')
         #[arg(long, short)]
         query: Option<String>,
+
+        /// Target application by name (focuses app, runs observe for element/query)
+        #[arg(long)]
+        app: Option<String>,
+
+        /// Target application by PID (focuses app, runs observe for element/query)
+        #[arg(long)]
+        pid: Option<u32>,
+
+        /// Absolute X coordinate to click (use with --y)
+        #[arg(long, requires = "y")]
+        x: Option<i32>,
+
+        /// Absolute Y coordinate to click (use with --x)
+        #[arg(long, requires = "x")]
+        y: Option<i32>,
 
         /// Pixel offset relative to center (format: x,y)
         #[arg(long)]
@@ -134,6 +163,14 @@ enum Commands {
         /// CSS-like query to select target element (e.g. 'text_field[name="Email"]')
         #[arg(long, short)]
         query: Option<String>,
+
+        /// Target application by name (focuses app, runs observe for element/query)
+        #[arg(long)]
+        app: Option<String>,
+
+        /// Target application by PID (focuses app, runs observe for element/query)
+        #[arg(long)]
+        pid: Option<u32>,
     },
 
     /// Scroll the screen or within a specific element
@@ -150,6 +187,14 @@ enum Commands {
         #[arg(long, short)]
         query: Option<String>,
 
+        /// Target application by name (focuses app, runs observe for element/query)
+        #[arg(long)]
+        app: Option<String>,
+
+        /// Target application by PID (focuses app, runs observe for element/query)
+        #[arg(long)]
+        pid: Option<u32>,
+
         /// Scroll amount in clicks (default: 3)
         #[arg(long)]
         amount: Option<u32>,
@@ -157,14 +202,57 @@ enum Commands {
 
     /// Press a key or key combination
     Key {
-        /// Key name (e.g. return, tab, escape, space, delete, up, down, left, right, f1-f12)
+        /// Key name, optionally with modifiers (e.g. "cmd+n", "ctrl+shift+t", "return")
         #[arg(long)]
         name: String,
 
-        /// Modifier keys (comma-separated: cmd, shift, alt, ctrl)
+        /// Modifier keys (comma-separated: cmd, shift, alt, ctrl). Can also use + syntax in --name.
         #[arg(long)]
         modifiers: Option<String>,
+
+        /// Target application by name (focuses app before sending key)
+        #[arg(long)]
+        app: Option<String>,
+
+        /// Target application by PID (focuses app before sending key)
+        #[arg(long)]
+        pid: Option<u32>,
     },
+
+    /// Wait for an element matching a query to appear
+    Wait {
+        /// CSS-like query to wait for (e.g. 'button[name="Submit"]')
+        #[arg(long, short)]
+        query: String,
+
+        /// Target application by name
+        #[arg(long)]
+        app: Option<String>,
+
+        /// Target application by PID
+        #[arg(long)]
+        pid: Option<u32>,
+
+        /// Timeout in seconds (default: 10)
+        #[arg(long, default_value = "10")]
+        timeout: u64,
+
+        /// Poll interval in milliseconds (default: 500)
+        #[arg(long, default_value = "500")]
+        interval: u64,
+    },
+}
+
+/// If --app/--pid is given, run an implicit observe and save state.
+fn ensure_app_observed(app: Option<&str>, pid: Option<u32>) -> Result<()> {
+    if app.is_none() && pid.is_none() {
+        return Ok(());
+    }
+    // Focus the app
+    platform::focus_app(app, pid)?;
+    // Run observe silently to populate state
+    commands::observe::run_observe_silent(app, pid)?;
+    Ok(())
 }
 
 /// Resolve --element vs --query, returning the element ID.
@@ -204,6 +292,17 @@ fn resolve_element_optional(element: Option<u32>, query: Option<&str>) -> Result
     }
 }
 
+/// Parse key name that may contain "+" modifiers (e.g. "cmd+n" -> ("n", Some("cmd")))
+fn parse_key_shorthand(name: &str, explicit_modifiers: Option<&str>) -> (String, Option<String>) {
+    if explicit_modifiers.is_some() || !name.contains('+') {
+        return (name.to_string(), explicit_modifiers.map(|s| s.to_string()));
+    }
+    let parts: Vec<&str> = name.split('+').collect();
+    let key = parts.last().unwrap().to_string();
+    let mods = parts[..parts.len() - 1].join(",");
+    (key, Some(mods))
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -215,28 +314,36 @@ fn main() -> Result<()> {
             max_elements,
             role,
             query,
+            element,
             include_hidden,
             format,
             raw,
         } => {
-            commands::observe::run_observe(
-                app.as_deref(),
-                pid,
-                max_depth,
-                max_elements,
-                role.as_deref(),
-                query.as_deref(),
-                !include_hidden,
-                &format,
-                raw,
-            )?;
+            if let Some(eid) = element {
+                commands::observe::run_observe_element(eid, &format)?;
+            } else {
+                commands::observe::run_observe(
+                    app.as_deref(),
+                    pid,
+                    max_depth,
+                    max_elements,
+                    role.as_deref(),
+                    query.as_deref(),
+                    !include_hidden,
+                    &format,
+                    raw,
+                )?;
+            }
         }
         Commands::Interact {
             element,
             query,
+            app,
+            pid,
             action,
             value,
         } => {
+            ensure_app_observed(app.as_deref(), pid)?;
             let eid = resolve_element(element, query.as_deref())?;
             commands::interact::run_interact(eid, &action, value.as_deref())?;
         }
@@ -246,9 +353,26 @@ fn main() -> Result<()> {
         Commands::Click {
             element,
             query,
+            app,
+            pid,
+            x,
+            y,
             offset,
             action,
         } => {
+            // Absolute coordinate click
+            if let (Some(cx), Some(cy)) = (x, y) {
+                if element.is_some() || query.is_some() {
+                    anyhow::bail!("Cannot use --x/--y with --element or --query");
+                }
+                if app.is_some() || pid.is_some() {
+                    platform::focus_app(app.as_deref(), pid)?;
+                }
+                platform::click_at(cx, cy)?;
+                println!("Clicked at ({}, {})", cx, cy);
+                return Ok(());
+            }
+            ensure_app_observed(app.as_deref(), pid)?;
             let eid = resolve_element(element, query.as_deref())?;
             let parsed_offset = match offset {
                 Some(ref s) => Some(commands::click::parse_offset(s)?),
@@ -256,7 +380,8 @@ fn main() -> Result<()> {
             };
             commands::click::run_click_element(eid, action, parsed_offset)?;
         }
-        Commands::Type { text, element, query } => {
+        Commands::Type { text, element, query, app, pid } => {
+            ensure_app_observed(app.as_deref(), pid)?;
             let eid = resolve_element_optional(element, query.as_deref())?;
             commands::type_text::run_type(eid, &text)?;
         }
@@ -264,15 +389,56 @@ fn main() -> Result<()> {
             direction,
             element,
             query,
+            app,
+            pid,
             amount,
         } => {
+            ensure_app_observed(app.as_deref(), pid)?;
             let eid = resolve_element_optional(element, query.as_deref())?;
             commands::scroll::run_scroll(eid, &direction, amount)?;
         }
-        Commands::Key { name, modifiers } => {
-            commands::key::run_key(&name, modifiers.as_deref())?;
+        Commands::Key { name, modifiers, app, pid } => {
+            if app.is_some() || pid.is_some() {
+                platform::focus_app(app.as_deref(), pid)?;
+            }
+            let (key, mods) = parse_key_shorthand(&name, modifiers.as_deref());
+            commands::key::run_key(&key, mods.as_deref())?;
+        }
+        Commands::Wait { query, app, pid, timeout, interval } => {
+            commands::wait::run_wait(
+                &query,
+                app.as_deref(),
+                pid,
+                timeout,
+                interval,
+            )?;
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_key_shorthand() {
+        let (key, mods) = parse_key_shorthand("cmd+n", None);
+        assert_eq!(key, "n");
+        assert_eq!(mods.unwrap(), "cmd");
+
+        let (key, mods) = parse_key_shorthand("ctrl+shift+t", None);
+        assert_eq!(key, "t");
+        assert_eq!(mods.unwrap(), "ctrl,shift");
+
+        let (key, mods) = parse_key_shorthand("return", None);
+        assert_eq!(key, "return");
+        assert!(mods.is_none());
+
+        // Explicit --modifiers takes precedence
+        let (key, mods) = parse_key_shorthand("cmd+n", Some("shift"));
+        assert_eq!(key, "cmd+n");
+        assert_eq!(mods.unwrap(), "shift");
+    }
 }
