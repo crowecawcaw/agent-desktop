@@ -1,0 +1,111 @@
+name: E2E macOS
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  e2e-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --verbose
+
+      # Probe the environment — what's available?
+      - name: Environment probe
+        run: |
+          echo "=== macOS version ==="
+          sw_vers
+          echo ""
+          echo "=== Architecture ==="
+          uname -m
+          echo ""
+          echo "=== Running apps ==="
+          osascript -e 'tell application "System Events" to get name of every process whose background only is false' || echo "System Events query failed"
+          echo ""
+          echo "=== Check accessibility (AXIsProcessTrusted) ==="
+          # Try to check if we're trusted for accessibility
+          swift -e 'import ApplicationServices; print("AXIsProcessTrusted:", AXIsProcessTrusted())' || echo "Swift check failed"
+          echo ""
+          echo "=== Try tccutil ==="
+          # See what we can learn about TCC database
+          tccutil reset Accessibility 2>&1 || echo "tccutil reset failed (expected)"
+          echo ""
+          echo "=== Check screencapture ==="
+          which screencapture && echo "screencapture available"
+          echo ""
+          echo "=== Check if Finder is running ==="
+          pgrep -x Finder && echo "Finder PID found" || echo "No Finder"
+          echo ""
+          echo "=== Try launching TextEdit ==="
+          open -a TextEdit 2>&1 || echo "TextEdit launch failed"
+          sleep 2
+          pgrep -x TextEdit && echo "TextEdit is running" || echo "TextEdit not running"
+          echo ""
+          echo "=== List running GUI processes ==="
+          ps aux | grep -E "(Finder|TextEdit|Safari|Dock|SystemUIServer)" | grep -v grep || echo "none found"
+
+      - name: Test screenshot
+        run: |
+          ./target/debug/agent-desktop screenshot --output /tmp/screen.png 2>&1 && echo "Screenshot succeeded" || echo "Screenshot failed (exit $?)"
+          ls -la /tmp/screen.png 2>/dev/null || echo "No screenshot file"
+
+      - name: Test observe (no app)
+        run: |
+          echo "=== observe with no target ==="
+          ./target/debug/agent-desktop observe 2>&1 || echo "Observe failed (exit $?)"
+
+      - name: Test observe --app Finder
+        run: |
+          echo "=== observe --app Finder ==="
+          ./target/debug/agent-desktop observe --app Finder 2>&1 || echo "Observe --app Finder failed (exit $?)"
+
+      - name: Test observe --app TextEdit
+        run: |
+          echo "=== observe --app TextEdit ==="
+          ./target/debug/agent-desktop observe --app TextEdit 2>&1 || echo "Observe --app TextEdit failed (exit $?)"
+
+      - name: Test focus --app Finder
+        run: |
+          echo "=== focus --app Finder ==="
+          ./target/debug/agent-desktop focus --app Finder 2>&1 || echo "Focus failed (exit $?)"
+
+      - name: Test click (coordinate)
+        run: |
+          echo "=== click at 100,100 ==="
+          ./target/debug/agent-desktop click --x 100 --y 100 2>&1 || echo "Click failed (exit $?)"
+
+      - name: Test scroll
+        run: |
+          echo "=== scroll down ==="
+          ./target/debug/agent-desktop scroll --direction down 2>&1 || echo "Scroll failed (exit $?)"
+
+      - name: Test key command
+        run: |
+          echo "=== key return ==="
+          ./target/debug/agent-desktop key --name return 2>&1 || echo "Key failed (exit $?)"
+
+      - name: Test read --clipboard
+        run: |
+          echo "=== read clipboard ==="
+          ./target/debug/agent-desktop read --clipboard 2>&1 || echo "Read clipboard failed (exit $?)"
+
+      - name: Test observe --list-roles
+        run: |
+          echo "=== observe --list-roles ==="
+          ./target/debug/agent-desktop observe --list-roles 2>&1 || echo "List roles failed (exit $?)"
+
+      - name: Test observe with query
+        run: |
+          echo "=== observe with query ==="
+          ./target/debug/agent-desktop observe -q 'button' 2>&1 || echo "Query observe failed (exit $?)"
