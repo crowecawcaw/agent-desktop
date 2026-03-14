@@ -229,6 +229,86 @@ end tell"#,
     Ok(())
 }
 
+pub fn key_press(name: &str, modifiers: &[&str]) -> Result<()> {
+    // Map key names to AppleScript key codes
+    let key_code = match name.to_lowercase().as_str() {
+        "return" | "enter" => Some(36),
+        "tab" => Some(48),
+        "escape" | "esc" => Some(53),
+        "space" => Some(49),
+        "delete" | "backspace" => Some(51),
+        "forward_delete" | "forwarddelete" => Some(117),
+        "up" => Some(126),
+        "down" => Some(125),
+        "left" => Some(123),
+        "right" => Some(124),
+        "home" => Some(115),
+        "end" => Some(119),
+        "page_up" | "pageup" => Some(116),
+        "page_down" | "pagedown" => Some(121),
+        "f1" => Some(122),
+        "f2" => Some(120),
+        "f3" => Some(99),
+        "f4" => Some(118),
+        "f5" => Some(96),
+        "f6" => Some(97),
+        "f7" => Some(98),
+        "f8" => Some(100),
+        "f9" => Some(101),
+        "f10" => Some(103),
+        "f11" => Some(111),
+        "f12" => Some(105),
+        _ => None,
+    };
+
+    // Build modifier clause
+    let modifier_str = if modifiers.is_empty() {
+        String::new()
+    } else {
+        let mapped: Vec<&str> = modifiers
+            .iter()
+            .map(|m| match *m {
+                "cmd" | "command" => "command down",
+                "shift" => "shift down",
+                "alt" | "option" => "option down",
+                "ctrl" | "control" => "control down",
+                _ => "command down", // validated earlier
+            })
+            .collect();
+        format!(" using {{{}}}", mapped.join(", "))
+    };
+
+    let script = if let Some(code) = key_code {
+        format!(
+            r#"tell application "System Events" to key code {}{}"#,
+            code, modifier_str
+        )
+    } else if name.len() == 1 {
+        // Single character — use keystroke
+        let escaped = name.replace('\\', "\\\\").replace('"', "\\\"");
+        format!(
+            r#"tell application "System Events" to keystroke "{}"{}"#,
+            escaped, modifier_str
+        )
+    } else {
+        anyhow::bail!(
+            "Unknown key '{}'. Use a single character or one of: return, tab, escape, space, \
+             delete, forward_delete, up, down, left, right, home, end, page_up, page_down, f1-f12",
+            name
+        );
+    };
+
+    let output = Command::new("osascript")
+        .args(["-e", &script])
+        .output()
+        .context("Failed to run osascript for key press")?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("osascript key press failed: {}", stderr);
+    }
+    Ok(())
+}
+
 pub fn scroll(direction: &str, amount: u32) -> Result<()> {
     let (dx, dy) = match direction {
         "up" => (0, amount as i32),

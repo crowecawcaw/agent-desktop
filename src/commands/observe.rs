@@ -1,6 +1,7 @@
 use anyhow::Result;
 
 use crate::platform::accessibility;
+use crate::query;
 use crate::state::PerceptState;
 use crate::types::*;
 
@@ -10,6 +11,7 @@ pub fn run_observe(
     max_depth: Option<u32>,
     max_elements: u32,
     role_filter: Option<&str>,
+    query_filter: Option<&str>,
     visible_only: bool,
     format: &str,
     include_raw: bool,
@@ -38,9 +40,35 @@ pub fn run_observe(
         accessibility::get_tree(&target, &opts)?
     };
 
-    // Save state for subsequent interact/click commands
+    // Save full state for subsequent interact/click commands
     let state = PerceptState::from_accessibility(snapshot.clone());
     state.save()?;
+
+    // If --query is given, filter the output to matching elements
+    if let Some(q) = query_filter {
+        let selector = query::parse_selector(q)
+            .map_err(|e| anyhow::anyhow!("Invalid query: {}", e))?;
+        let ids = query::query_elements(&snapshot.elements, &selector);
+        let filtered: Vec<&AccessibilityElement> = snapshot
+            .elements
+            .iter()
+            .filter(|e| ids.contains(&e.id))
+            .collect();
+
+        match format {
+            "tree" => {
+                println!("Query '{}' matched {} elements:", q, filtered.len());
+                for elem in &filtered {
+                    print_element_summary(elem);
+                }
+            }
+            _ => {
+                let json = serde_json::to_string_pretty(&filtered)?;
+                println!("{}", json);
+            }
+        }
+        return Ok(());
+    }
 
     match format {
         "tree" => print_tree(&snapshot),
@@ -51,6 +79,20 @@ pub fn run_observe(
     }
 
     Ok(())
+}
+
+fn print_element_summary(elem: &AccessibilityElement) {
+    let mut line = format!("[{}] {}", elem.id, elem.role_name);
+    if let Some(ref name) = elem.name {
+        line.push_str(&format!(" \"{}\"", name));
+    }
+    if let Some(ref bounds) = elem.bounds {
+        line.push_str(&format!(
+            " ({},{} {}x{})",
+            bounds.x, bounds.y, bounds.width, bounds.height
+        ));
+    }
+    println!("{}", line);
 }
 
 fn print_tree(snapshot: &AccessibilitySnapshot) {

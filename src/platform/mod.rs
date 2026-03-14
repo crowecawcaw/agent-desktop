@@ -62,3 +62,10 @@ pub fn scroll(direction: &str, amount: u32) -> Result<()> {
         Platform::MacOS => macos::scroll(direction, amount),
     }
 }
+
+pub fn key_press(name: &str, modifiers: &[&str]) -> Result<()> {
+    match Platform::detect()? {
+        Platform::Linux => linux::key_press(name, modifiers),
+        Platform::MacOS => macos::key_press(name, modifiers),
+    }
+}
