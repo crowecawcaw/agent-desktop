@@ -56,6 +56,10 @@ enum Commands {
         #[arg(long)]
         element: Option<u32>,
 
+        /// Show role distribution (counts by role type)
+        #[arg(long)]
+        list_roles: bool,
+
         /// Include hidden/offscreen elements
         #[arg(long)]
         include_hidden: bool,
@@ -219,6 +223,40 @@ enum Commands {
         pid: Option<u32>,
     },
 
+    /// Focus an application or element without clicking
+    Focus {
+        /// Target application by name
+        #[arg(long)]
+        app: Option<String>,
+
+        /// Target application by PID
+        #[arg(long)]
+        pid: Option<u32>,
+
+        /// Element ID to focus via accessibility API
+        #[arg(long)]
+        element: Option<u32>,
+
+        /// CSS-like query to select element to focus
+        #[arg(long, short)]
+        query: Option<String>,
+    },
+
+    /// Read text content from an element or the clipboard
+    Read {
+        /// Element ID to read text from
+        #[arg(long)]
+        element: Option<u32>,
+
+        /// CSS-like query to select element to read
+        #[arg(long, short)]
+        query: Option<String>,
+
+        /// Read from clipboard instead of an element
+        #[arg(long)]
+        clipboard: bool,
+    },
+
     /// Wait for an element matching a query to appear
     Wait {
         /// CSS-like query to wait for (e.g. 'button[name="Submit"]')
@@ -315,6 +353,7 @@ fn main() -> Result<()> {
             role,
             query,
             element,
+            list_roles,
             include_hidden,
             format,
             raw,
@@ -332,6 +371,7 @@ fn main() -> Result<()> {
                     !include_hidden,
                     &format,
                     raw,
+                    list_roles,
                 )?;
             }
         }
@@ -403,6 +443,30 @@ fn main() -> Result<()> {
             }
             let (key, mods) = parse_key_shorthand(&name, modifiers.as_deref());
             commands::key::run_key(&key, mods.as_deref())?;
+        }
+        Commands::Focus { app, pid, element, query } => {
+            if app.is_some() || pid.is_some() {
+                platform::focus_app(app.as_deref(), pid)?;
+                // If also targeting an element, observe first
+                if element.is_some() || query.is_some() {
+                    commands::observe::run_observe_silent(app.as_deref(), pid)?;
+                } else {
+                    println!("Focused {}", app.unwrap_or_else(|| pid.unwrap().to_string()));
+                    return Ok(());
+                }
+            }
+            if element.is_some() || query.is_some() {
+                let eid = resolve_element(element, query.as_deref())?;
+                commands::interact::run_interact(eid, "focus", None)?;
+            }
+        }
+        Commands::Read { element, query, clipboard } => {
+            if clipboard {
+                commands::read::run_read_clipboard()?;
+            } else {
+                let eid = resolve_element(element, query.as_deref())?;
+                commands::read::run_read_element(eid)?;
+            }
         }
         Commands::Wait { query, app, pid, timeout, interval } => {
             commands::wait::run_wait(

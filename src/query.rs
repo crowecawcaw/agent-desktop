@@ -235,10 +235,12 @@ fn parse_tokens(tokens: &[Token]) -> Result<Vec<SelectorSegment>, String> {
                     }
                     match tokens.get(i) {
                         Some(Token::Text(n)) => {
-                            nth = Some(
-                                n.parse::<usize>()
-                                    .map_err(|_| format!("Invalid :nth value: {}", n))?,
-                            );
+                            let val = n.parse::<usize>()
+                                .map_err(|_| format!("Invalid :nth value: {}", n))?;
+                            if val == 0 {
+                                return Err(":nth() is 1-based. Use :nth(1) for the first match.".to_string());
+                            }
+                            nth = Some(val);
                             i += 1;
                         }
                         _ => return Err("Expected number in :nth()".to_string()),

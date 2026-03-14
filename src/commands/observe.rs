@@ -15,6 +15,7 @@ pub fn run_observe(
     visible_only: bool,
     format: &str,
     include_raw: bool,
+    list_roles: bool,
 ) -> Result<()> {
     let all_apps = app.is_none() && pid.is_none();
     let effective_depth = max_depth.unwrap_or(if all_apps { 1 } else { 10 });
@@ -44,6 +45,19 @@ pub fn run_observe(
     let state = PerceptState::from_accessibility(snapshot.clone());
     state.save()?;
 
+    // Show role distribution
+    if list_roles {
+        let mut counts: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+        for elem in &snapshot.elements {
+            *counts.entry(elem.role_name.clone()).or_insert(0) += 1;
+        }
+        println!("Roles ({} elements):", snapshot.element_count);
+        for (role, count) in &counts {
+            println!("  {:20} {}", role, count);
+        }
+        return Ok(());
+    }
+
     // If --query is given, filter the output to matching elements
     if let Some(q) = query_filter {
         let selector = query::parse_selector(q)
@@ -63,7 +77,14 @@ pub fn run_observe(
                 }
             }
             _ => {
-                let json = serde_json::to_string_pretty(&filtered)?;
+                let result = serde_json::json!({
+                    "app_name": snapshot.app_name,
+                    "pid": snapshot.pid,
+                    "query": q,
+                    "match_count": filtered.len(),
+                    "elements": filtered,
+                });
+                let json = serde_json::to_string_pretty(&result)?;
                 println!("{}", json);
             }
         }

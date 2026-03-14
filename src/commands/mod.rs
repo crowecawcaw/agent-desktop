@@ -2,6 +2,7 @@ pub mod click;
 pub mod interact;
 pub mod key;
 pub mod observe;
+pub mod read;
 pub mod screenshot;
 pub mod scroll;
 pub mod type_text;
