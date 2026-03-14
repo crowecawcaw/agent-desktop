@@ -123,6 +123,8 @@ jobs:
 
       - name: "Test: read --clipboard returns JSON"
         run: |
+          # Seed clipboard first — xclip fails on empty clipboard
+          echo -n "test content" | xclip -selection clipboard
           OUTPUT=$(./target/debug/agent-desktop read --clipboard 2>&1)
           echo "$OUTPUT"
           echo "$OUTPUT" | grep -q 'clipboard'
