@@ -70,13 +70,7 @@ pub fn run_observe(
             .collect();
 
         match format {
-            "tree" => {
-                println!("Query '{}' matched {} elements:", q, filtered.len());
-                for elem in &filtered {
-                    print_element_summary(elem);
-                }
-            }
-            _ => {
+            "json" => {
                 let result = serde_json::json!({
                     "app_name": snapshot.app_name,
                     "pid": snapshot.pid,
@@ -87,16 +81,22 @@ pub fn run_observe(
                 let json = serde_json::to_string_pretty(&result)?;
                 println!("{}", json);
             }
+            _ => {
+                println!("<!-- query '{}' matched {} element(s) -->", q, filtered.len());
+                for elem in &filtered {
+                    print_element_xml(elem, &snapshot.elements, "", true);
+                }
+            }
         }
         return Ok(());
     }
 
     match format {
-        "tree" => print_tree(&snapshot),
-        _ => {
+        "json" => {
             let json = serde_json::to_string_pretty(&snapshot)?;
             println!("{}", json);
         }
+        _ => print_xml(&snapshot),
     }
 
     Ok(())
@@ -158,113 +158,135 @@ pub fn run_observe_element(element_id: u32, format: &str) -> Result<()> {
     }
 
     match format {
-        "tree" => {
-            println!("Element {} subtree ({} elements):", element_id, subtree.len());
-            if let Some(root) = snapshot.elements.iter().find(|e| e.id == element_id) {
-                print_tree_node(root, &snapshot.elements, "", true);
-            }
-        }
-        _ => {
+        "json" => {
             let json = serde_json::to_string_pretty(&subtree)?;
             println!("{}", json);
+        }
+        _ => {
+            if let Some(root) = snapshot.elements.iter().find(|e| e.id == element_id) {
+                print_element_xml(root, &snapshot.elements, "", true);
+            }
         }
     }
 
     Ok(())
 }
 
-fn print_element_summary(elem: &AccessibilityElement) {
-    let mut line = format!("[{}] {}", elem.id, elem.role_name);
-    if let Some(ref name) = elem.name {
-        line.push_str(&format!(" \"{}\"", name));
-    }
-    if let Some(ref bounds) = elem.bounds {
-        line.push_str(&format!(
-            " ({},{} {}x{})",
-            bounds.x, bounds.y, bounds.width, bounds.height
-        ));
-    }
-    println!("{}", line);
+// ---------------------------------------------------------------------------
+// XML output
+// ---------------------------------------------------------------------------
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
-fn print_tree(snapshot: &AccessibilitySnapshot) {
+fn print_xml(snapshot: &AccessibilitySnapshot) {
+    println!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+
     if snapshot.pid == 0 {
-        println!("All applications ({} elements)", snapshot.element_count);
+        // All-apps overview
+        println!("<applications count=\"{}\">", snapshot.element_count);
     } else {
-        println!("{} (pid: {})", snapshot.app_name, snapshot.pid);
+        println!(
+            "<application name=\"{}\" pid=\"{}\" screen=\"{}x{}\">",
+            xml_escape(&snapshot.app_name),
+            snapshot.pid,
+            snapshot.screen_width,
+            snapshot.screen_height,
+        );
     }
 
-    // Build a map of parent -> children for rendering
     let root_elements: Vec<&AccessibilityElement> = snapshot
         .elements
         .iter()
         .filter(|e| e.parent.is_none() || e.depth == 0)
         .collect();
 
-    for (i, elem) in root_elements.iter().enumerate() {
-        let is_last = i == root_elements.len() - 1;
-        print_tree_node(elem, &snapshot.elements, "", is_last);
+    for elem in &root_elements {
+        print_element_xml(elem, &snapshot.elements, "  ", false);
+    }
+
+    if snapshot.pid == 0 {
+        println!("</applications>");
+    } else {
+        println!("</application>");
     }
 }
 
-fn print_tree_node(
+fn print_element_xml(
     elem: &AccessibilityElement,
     all_elements: &[AccessibilityElement],
-    prefix: &str,
-    is_last: bool,
+    indent: &str,
+    standalone: bool,
 ) {
-    let connector = if is_last { "└── " } else { "├── " };
-
-    let mut line = format!(
-        "{}{}[{}] {}",
-        prefix, connector, elem.id, elem.role_name
-    );
+    let tag = &elem.role_name;
+    let mut attrs = format!(" id=\"{}\"", elem.id);
 
     if let Some(ref name) = elem.name {
-        line.push_str(&format!(" \"{}\"", name));
+        attrs.push_str(&format!(" name=\"{}\"", xml_escape(name)));
     }
-
+    if let Some(ref value) = elem.value {
+        attrs.push_str(&format!(" value=\"{}\"", xml_escape(value)));
+    }
+    if let Some(ref description) = elem.description {
+        attrs.push_str(&format!(" description=\"{}\"", xml_escape(description)));
+    }
     if let Some(ref bounds) = elem.bounds {
-        line.push_str(&format!(
-            " ({},{} {}x{})",
+        attrs.push_str(&format!(
+            " bounds=\"{},{} {}x{}\"",
             bounds.x, bounds.y, bounds.width, bounds.height
         ));
     }
 
-    if !elem.actions.is_empty() {
-        line.push_str(&format!(" [{}]", elem.actions.join(",")));
-    }
-
-    // State annotations
-    let mut state_tags = Vec::new();
+    // State flags (only include non-default / notable states)
     if !elem.states.enabled {
-        state_tags.push("disabled");
+        attrs.push_str(" disabled");
     }
     if elem.states.focused {
-        state_tags.push("focused");
+        attrs.push_str(" focused");
     }
     if elem.states.selected {
-        state_tags.push("selected");
+        attrs.push_str(" selected");
     }
     if let Some(true) = elem.states.checked {
-        state_tags.push("checked");
+        attrs.push_str(" checked");
     }
     if let Some(true) = elem.states.expanded {
-        state_tags.push("expanded");
+        attrs.push_str(" expanded");
     }
-    if !state_tags.is_empty() {
-        line.push_str(&format!(" {{{}}}", state_tags.join(",")));
+    if elem.states.editable {
+        attrs.push_str(" editable");
     }
 
-    println!("{}", line);
+    if !elem.actions.is_empty() {
+        attrs.push_str(&format!(
+            " actions=\"{}\"",
+            xml_escape(&elem.actions.join(","))
+        ));
+    }
 
-    // Print children
-    let child_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
+    // Collect children
+    let children: Vec<&AccessibilityElement> = elem
+        .children
+        .iter()
+        .filter_map(|id| all_elements.iter().find(|e| e.id == *id))
+        .collect();
 
-    for (i, child_id) in elem.children.iter().enumerate() {
-        if let Some(child) = all_elements.iter().find(|e| e.id == *child_id) {
-            let child_is_last = i == elem.children.len() - 1;
-            print_tree_node(child, all_elements, &child_prefix, child_is_last);
+    if children.is_empty() {
+        println!("{}<{}{} />", indent, tag, attrs);
+    } else {
+        println!("{}<{}{}>", indent, tag, attrs);
+        let child_indent = format!("{}  ", indent);
+        for child in &children {
+            print_element_xml(child, all_elements, &child_indent, false);
         }
+        println!("{}</{}>", indent, tag);
     }
+
+    // If standalone mode (query results), print subtree of each child recursively
+    // (already handled above via children)
+    let _ = standalone;
 }
