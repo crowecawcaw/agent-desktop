@@ -11,9 +11,6 @@ use crate::types::{AccessibilitySnapshot, AppTarget, ElementRole, PermissionStat
 
 /// Platform-agnostic accessibility query interface
 pub trait AccessibilityProvider {
-    /// Get the accessibility tree for the focused application
-    fn get_focused_app_tree(&self, opts: &QueryOptions) -> Result<AccessibilitySnapshot>;
-
     /// Get the accessibility tree for a specific application
     fn get_app_tree(&self, app: &AppTarget, opts: &QueryOptions) -> Result<AccessibilitySnapshot>;
 
@@ -68,7 +65,6 @@ pub fn get_all_apps_overview(opts: &QueryOptions) -> Result<AccessibilitySnapsho
                 instructions
             );
         }
-        PermissionStatus::Unknown => {}
     }
     provider.get_all_apps_tree(opts)
 }
@@ -86,15 +82,9 @@ pub fn get_tree(target: &AppTarget, opts: &QueryOptions) -> Result<Accessibility
                 instructions
             );
         }
-        PermissionStatus::Unknown => {
-            // Proceed and let it fail naturally if permissions are actually missing
-        }
     }
 
-    match target {
-        AppTarget::Focused => provider.get_focused_app_tree(opts),
-        _ => provider.get_app_tree(target, opts),
-    }
+    provider.get_app_tree(target, opts)
 }
 
 /// Perform an accessibility action on an element.
@@ -138,7 +128,6 @@ pub fn perform_action(element_id: u32, action: &str, value: Option<&str>) -> Res
                 instructions
             );
         }
-        PermissionStatus::Unknown => {}
     }
 
     // Populate the in-process element cache by re-traversing the same app.

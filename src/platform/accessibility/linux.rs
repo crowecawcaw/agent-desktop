@@ -47,11 +47,6 @@ impl LinuxAccessibilityProvider {
 }
 
 impl super::AccessibilityProvider for LinuxAccessibilityProvider {
-    fn get_focused_app_tree(&self, opts: &QueryOptions) -> Result<AccessibilitySnapshot> {
-        let rt = tokio::runtime::Runtime::new()?;
-        rt.block_on(get_focused_tree_async(opts, &self.element_cache))
-    }
-
     fn get_app_tree(&self, app: &AppTarget, opts: &QueryOptions) -> Result<AccessibilitySnapshot> {
         let rt = tokio::runtime::Runtime::new()?;
         rt.block_on(get_app_tree_async(app, opts, &self.element_cache))
@@ -95,128 +90,12 @@ impl super::AccessibilityProvider for LinuxAccessibilityProvider {
                             ),
                         })
                     } else {
-                        Ok(PermissionStatus::Unknown)
+                        Ok(PermissionStatus::Granted)
                     }
                 }
             }
         })
     }
-}
-
-async fn get_focused_tree_async(
-    opts: &QueryOptions,
-    cache: &Mutex<HashMap<u32, CachedElement>>,
-) -> Result<AccessibilitySnapshot> {
-    let a11y = AccessibilityConnection::new()
-        .await
-        .context("Failed to connect to AT-SPI2 accessibility bus")?;
-    let conn = a11y.connection();
-
-    let registry = AccessibleProxy::builder(conn)
-        .destination("org.a11y.atspi.Registry")?
-        .path("/org/a11y/atspi/accessible/root")?
-        .build()
-        .await
-        .context("Failed to connect to AT-SPI2 registry")?;
-
-    let children = registry
-        .get_children()
-        .await
-        .context("Failed to get desktop children")?;
-
-    // Find the focused application
-    let mut focused_app: Option<(String, String)> = None;
-    for child_ref in &children {
-        let bus = child_ref.name.as_str();
-        let path = child_ref.path.as_str();
-
-        if let Ok(proxy) = AccessibleProxy::builder(conn)
-            .destination(bus)?
-            .path(path)?
-            .build()
-            .await
-        {
-            if let Ok(app_children) = proxy.get_children().await {
-                for app_child in &app_children {
-                    if let Ok(child_proxy) = AccessibleProxy::builder(conn)
-                        .destination(app_child.name.as_str())?
-                        .path(app_child.path.as_str())?
-                        .build()
-                        .await
-                    {
-                        if let Ok(states) = child_proxy.get_state().await {
-                            if states.contains(State::Active) || states.contains(State::Focused) {
-                                focused_app =
-                                    Some((bus.to_string(), path.to_string()));
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            if focused_app.is_some() {
-                break;
-            }
-        }
-    }
-
-    let (bus_name, obj_path) = focused_app.unwrap_or_else(|| {
-        if let Some(first) = children.first() {
-            (first.name.to_string(), first.path.to_string())
-        } else {
-            (
-                "org.a11y.atspi.Registry".to_string(),
-                "/org/a11y/atspi/accessible/root".to_string(),
-            )
-        }
-    });
-
-    let app_proxy = AccessibleProxy::builder(conn)
-        .destination(bus_name.as_str())?
-        .path(obj_path.as_str())?
-        .build()
-        .await?;
-
-    let app_name = app_proxy.name().await.unwrap_or_default();
-    let pid = get_pid(conn, &bus_name).await.unwrap_or(0);
-    let (screen_w, screen_h) = LinuxAccessibilityProvider::get_screen_size();
-
-    let mut elements = Vec::new();
-    let mut id_counter = 0u32;
-    let mut cache_guard = cache.lock().unwrap();
-    cache_guard.clear();
-
-    traverse_tree(
-        conn,
-        &bus_name,
-        &obj_path,
-        opts,
-        &mut elements,
-        &mut id_counter,
-        0,
-        None,
-        screen_w,
-        screen_h,
-        &app_name,
-        &mut cache_guard,
-    )
-    .await?;
-
-    let element_count = elements.len();
-    Ok(AccessibilitySnapshot {
-        app_name,
-        pid,
-        screen_width: screen_w,
-        screen_height: screen_h,
-        element_count,
-        elements,
-        query_max_depth: opts.max_depth,
-        query_max_elements: opts.max_elements,
-        query_visible_only: opts.visible_only,
-        query_roles: opts.roles.as_ref()
-            .map(|r| r.iter().map(|role| role.display_name().to_string()).collect())
-            .unwrap_or_default(),
-    })
 }
 
 async fn get_app_tree_async(
@@ -257,7 +136,6 @@ async fn get_app_tree_async(
             let matched = match app {
                 AppTarget::ByName(ref n) => name.to_lowercase().contains(&n.to_lowercase()),
                 AppTarget::ByPid(p) => pid == *p,
-                AppTarget::Focused => false,
             };
 
             if matched {

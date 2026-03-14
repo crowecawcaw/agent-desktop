@@ -48,85 +48,6 @@ impl WindowsAccessibilityProvider {
 }
 
 impl super::AccessibilityProvider for WindowsAccessibilityProvider {
-    fn get_focused_app_tree(&self, opts: &QueryOptions) -> Result<AccessibilitySnapshot> {
-        unsafe {
-            let focused = self
-                .automation
-                .GetFocusedElement()
-                .context("Failed to get focused element")?;
-
-            // Walk up to find the top-level window
-            let walker = self
-                .automation
-                .CreateTreeWalker(&self.automation.ContentViewCondition()?)
-                .context("Failed to create tree walker")?;
-
-            let mut top = focused.clone();
-            loop {
-                match walker.GetParentElement(&top) {
-                    Ok(parent) => {
-                        let control_type = parent
-                            .CurrentControlType()
-                            .unwrap_or(UIA_CustomControlTypeId);
-                        if control_type == UIA_WindowControlTypeId {
-                            top = parent;
-                            break;
-                        }
-                        // Check if parent is the desktop root
-                        let root = self.automation.GetRootElement()?;
-                        if self.automation.CompareElements(&parent, &root)?.as_bool() {
-                            break;
-                        }
-                        top = parent;
-                    }
-                    Err(_) => break,
-                }
-            }
-
-            let name = top
-                .CurrentName()
-                .map(|s| s.to_string())
-                .unwrap_or_default();
-            let pid = top.CurrentProcessId().unwrap_or(0) as u32;
-            let (screen_w, screen_h) = Self::get_screen_size();
-
-            let mut elements = Vec::new();
-            let mut id_counter = 0u32;
-            let mut cache = self.element_cache.lock().unwrap();
-            cache.clear();
-
-            traverse_uia_tree(
-                &top,
-                &self.automation,
-                opts,
-                &mut elements,
-                &mut id_counter,
-                0,
-                None,
-                screen_w,
-                screen_h,
-                &name,
-                &mut cache,
-            )?;
-
-            let element_count = elements.len();
-            Ok(AccessibilitySnapshot {
-                app_name: name,
-                pid,
-                screen_width: screen_w,
-                screen_height: screen_h,
-                element_count,
-                elements,
-                query_max_depth: opts.max_depth,
-                query_max_elements: opts.max_elements,
-                query_visible_only: opts.visible_only,
-                query_roles: opts.roles.as_ref()
-                    .map(|r| r.iter().map(|role| role.display_name().to_string()).collect())
-                    .unwrap_or_default(),
-            })
-        }
-    }
-
     fn get_app_tree(&self, app: &AppTarget, opts: &QueryOptions) -> Result<AccessibilitySnapshot> {
         unsafe {
             let root = self
@@ -151,9 +72,7 @@ impl super::AccessibilityProvider for WindowsAccessibilityProvider {
                     root.FindFirst(TreeScope_Descendants, &condition)
                         .context(format!("No window found for '{}'", name))?
                 }
-                AppTarget::Focused => {
-                    return self.get_focused_app_tree(opts);
-                }
+
             };
 
             let name = target

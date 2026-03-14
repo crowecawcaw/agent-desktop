@@ -10,26 +10,6 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
-    pub fn new(x1: f64, y1: f64, x2: f64, y2: f64) -> Self {
-        Self { x1, y1, x2, y2 }
-    }
-
-    pub fn width(&self) -> f64 {
-        self.x2 - self.x1
-    }
-
-    pub fn height(&self) -> f64 {
-        self.y2 - self.y1
-    }
-
-    pub fn area(&self) -> f64 {
-        self.width() * self.height()
-    }
-
-    pub fn center(&self) -> (f64, f64) {
-        ((self.x1 + self.x2) / 2.0, (self.y1 + self.y2) / 2.0)
-    }
-
     /// Create from pixel bounds and screen dimensions, normalizing to [0,1]
     pub fn from_pixel_bounds(bounds: &ElementBounds, screen_w: u32, screen_h: u32) -> Self {
         Self {
@@ -282,7 +262,6 @@ impl Default for QueryOptions {
 /// Target application for accessibility queries
 #[derive(Debug, Clone)]
 pub enum AppTarget {
-    Focused,
     ByName(String),
     ByPid(u32),
 }
@@ -292,5 +271,4 @@ pub enum AppTarget {
 pub enum PermissionStatus {
     Granted,
     Denied { instructions: String },
-    Unknown,
 }

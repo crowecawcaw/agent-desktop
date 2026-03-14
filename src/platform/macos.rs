@@ -37,7 +37,6 @@ extern "C" {
     ) -> AXError;
     fn AXValueGetValue(value: *const c_void, value_type: u32, value_ptr: *mut c_void) -> bool;
     fn CFRelease(cf: *const c_void);
-    fn CFRetain(cf: *const c_void) -> *const c_void;
 }
 
 fn get_pid_for_app(name: &str) -> Result<i32> {

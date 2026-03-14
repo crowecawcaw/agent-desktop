@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use core_foundation::array::CFArray;
 use core_foundation::base::{CFType, TCFType};
 use core_foundation::boolean::CFBoolean;
-use core_foundation::number::CFNumber;
 use core_foundation::string::CFString;
 use std::collections::HashMap;
 use std::ffi::c_void;
@@ -17,11 +16,9 @@ type AXUIElementRef = *const c_void;
 type AXError = i32;
 
 const K_AX_ERROR_SUCCESS: AXError = 0;
-const K_AX_ERROR_API_DISABLED: AXError = -25211;
 
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
-    fn AXUIElementCreateSystemWide() -> AXUIElementRef;
     fn AXUIElementCreateApplication(pid: i32) -> AXUIElementRef;
     fn AXUIElementCopyAttributeValue(
         element: AXUIElementRef,
@@ -149,73 +146,9 @@ impl MacOSAccessibilityProvider {
         }
     }
 
-    fn get_focused_pid() -> Result<i32> {
-        let output = std::process::Command::new("osascript")
-            .args([
-                "-e",
-                r#"tell application "System Events" to get unix id of first process whose frontmost is true"#,
-            ])
-            .output()
-            .context("Failed to get focused application PID")?;
-
-        let pid_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        pid_str
-            .parse::<i32>()
-            .context("Failed to parse PID from osascript output")
-    }
 }
 
 impl super::AccessibilityProvider for MacOSAccessibilityProvider {
-    fn get_focused_app_tree(&self, opts: &QueryOptions) -> Result<AccessibilitySnapshot> {
-        let pid = Self::get_focused_pid()?;
-        let app_elem = unsafe { AXUIElementCreateApplication(pid) };
-        if app_elem.is_null() {
-            anyhow::bail!("Failed to create AXUIElement for focused app (pid {})", pid);
-        }
-
-        let app_name = get_string_attr(app_elem, "AXTitle")
-            .or_else(|| get_string_attr(app_elem, "AXRoleDescription"))
-            .unwrap_or_else(|| format!("pid:{}", pid));
-
-        let (screen_w, screen_h) = Self::get_screen_size();
-
-        let mut elements = Vec::new();
-        let mut id_counter = 0u32;
-        let mut cache = self.element_cache.lock().unwrap();
-        cache.clear();
-
-        traverse_ax_tree(
-            app_elem,
-            opts,
-            &mut elements,
-            &mut id_counter,
-            0,
-            None,
-            screen_w,
-            screen_h,
-            &app_name,
-            &mut cache,
-        );
-
-        unsafe { CFRelease(app_elem) };
-
-        let element_count = elements.len();
-        Ok(AccessibilitySnapshot {
-            app_name,
-            pid: pid as u32,
-            screen_width: screen_w,
-            screen_height: screen_h,
-            element_count,
-            elements,
-            query_max_depth: opts.max_depth,
-            query_max_elements: opts.max_elements,
-            query_visible_only: opts.visible_only,
-            query_roles: opts.roles.as_ref()
-                .map(|r| r.iter().map(|role| role.display_name().to_string()).collect())
-                .unwrap_or_default(),
-        })
-    }
-
     fn get_all_apps_tree(&self, opts: &QueryOptions) -> Result<AccessibilitySnapshot> {
         let pids = Self::get_all_app_pids();
         let (screen_w, screen_h) = Self::get_screen_size();
@@ -278,7 +211,6 @@ impl super::AccessibilityProvider for MacOSAccessibilityProvider {
                     .parse::<i32>()
                     .context(format!("App '{}' not found", name))?
             }
-            AppTarget::Focused => Self::get_focused_pid()?,
         };
 
         let app_elem = unsafe { AXUIElementCreateApplication(pid) };
@@ -349,7 +281,7 @@ impl super::AccessibilityProvider for MacOSAccessibilityProvider {
                 ax_perform_action(handle.element, "AXPress")?;
             }
             "focus" => {
-                let cf_true = unsafe { CFBoolean::true_value().as_concrete_TypeRef() as *const c_void };
+                let cf_true = CFBoolean::true_value().as_concrete_TypeRef() as *const c_void;
                 let attr = CFString::new("AXFocused");
                 let err = unsafe {
                     AXUIElementSetAttributeValue(
