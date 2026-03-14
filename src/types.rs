@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// Bounding box with coordinates normalized to [0.0, 1.0] range
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -31,12 +30,6 @@ impl BoundingBox {
         ((self.x1 + self.x2) / 2.0, (self.y1 + self.y2) / 2.0)
     }
 
-    /// Compute center pixel coordinates given image dimensions
-    pub fn center_pixels(&self, img_width: u32, img_height: u32) -> (i32, i32) {
-        let (cx, cy) = self.center();
-        ((cx * img_width as f64) as i32, (cy * img_height as f64) as i32)
-    }
-
     /// Create from pixel bounds and screen dimensions, normalizing to [0,1]
     pub fn from_pixel_bounds(bounds: &ElementBounds, screen_w: u32, screen_h: u32) -> Self {
         Self {
@@ -46,27 +39,6 @@ impl BoundingBox {
             y2: (bounds.y + bounds.height) as f64 / screen_h as f64,
         }
     }
-}
-
-/// A detected UI element with an assigned block ID
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Block {
-    pub id: u32,
-    pub bbox: BoundingBox,
-}
-
-/// Result of running the annotation pipeline
-#[allow(dead_code)]
-pub struct AnnotationResult {
-    pub blocks: Vec<Block>,
-    pub annotated_image_path: PathBuf,
-}
-
-/// Raw detection from YOLO before NMS
-#[derive(Debug, Clone)]
-pub struct Detection {
-    pub bbox: BoundingBox,
-    pub confidence: f64,
 }
 
 // ---------------------------------------------------------------------------
@@ -321,13 +293,4 @@ pub enum PermissionStatus {
     Granted,
     Denied { instructions: String },
     Unknown,
-}
-
-/// Source of state data
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum StateSource {
-    Accessibility,
-    Yolo,
-    Merged,
 }

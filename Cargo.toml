@@ -2,25 +2,17 @@
 name = "percept"
 version = "0.1.0"
 edition = "2021"
-description = "CLI tool that annotates screenshots using OmniParser and provides computer interaction via block IDs"
+description = "CLI tool for AI agents to observe and interact with desktop UIs via accessibility APIs"
 license = "MIT"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-ort = { version = "2.0.0-rc.9", features = ["load-dynamic", "ndarray"] }
-ndarray = "0.16"
 image = "0.25"
-imageproc = "0.25"
-ab_glyph = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 dirs = "6"
-reqwest = { version = "0.12", features = ["stream"] }
-indicatif = "0.17"
-sha2 = "0.10"
 anyhow = "1"
-futures-util = "0.3"
 
 # Linux AT-SPI2 accessibility
 [target.'cfg(target_os = "linux")'.dependencies]

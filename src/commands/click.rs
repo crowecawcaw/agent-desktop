@@ -4,27 +4,6 @@ use crate::platform;
 use crate::platform::accessibility;
 use crate::state::PerceptState;
 
-/// Click a YOLO block by ID
-pub fn run_click(block_id: u32, offset: Option<(i32, i32)>) -> Result<()> {
-    let state = PerceptState::load()?;
-    let block = state.get_block(block_id)?;
-
-    let (cx, cy) = block.bbox.center_pixels(state.image_width, state.image_height);
-    let (x, y) = match offset {
-        Some((ox, oy)) => (cx + ox, cy + oy),
-        None => (cx, cy),
-    };
-
-    platform::click_at(x, y).context(format!(
-        "Failed to click at ({}, {}). Is xdotool installed?",
-        x, y
-    ))?;
-
-    println!("Clicked block {} at ({}, {})", block_id, x, y);
-
-    Ok(())
-}
-
 /// Click an accessibility element by ID, using either native action or mouse sim
 pub fn run_click_element(
     element_id: u32,
