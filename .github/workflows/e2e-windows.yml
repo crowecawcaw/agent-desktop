@@ -21,62 +21,53 @@ jobs:
       - name: Build
         run: cargo build --verbose
 
-      - name: Environment probe
+      - name: Launch Notepad and save PID
+        id: notepad
         shell: pwsh
         run: |
-          Write-Host "=== Windows version ==="
-          [System.Environment]::OSVersion
-          Write-Host ""
-          Write-Host "=== Architecture ==="
-          $env:PROCESSOR_ARCHITECTURE
-          Write-Host ""
-          Write-Host "=== Running GUI processes ==="
-          Get-Process | Where-Object { $_.MainWindowTitle -ne "" } | Select-Object ProcessName, Id, MainWindowTitle | Format-Table
-          Write-Host ""
-          Write-Host "=== Launch Notepad ==="
           Start-Process notepad
           Start-Sleep -Seconds 2
-          Get-Process notepad -ErrorAction SilentlyContinue | Select-Object ProcessName, Id, MainWindowTitle | Format-Table
+          $proc = Get-Process notepad -ErrorAction SilentlyContinue | Select-Object -First 1
+          Write-Host "Notepad PID: $($proc.Id), Title: $($proc.MainWindowTitle)"
+          echo "PID=$($proc.Id)" >> $env:GITHUB_OUTPUT
 
       # --- Accessibility tests (observe/interact — fully implemented) ---
 
-      - name: "Test: observe --app Notepad returns elements"
+      - name: "Test: observe --pid returns elements"
         shell: pwsh
         run: |
-          $output = & ./target/debug/agent-desktop.exe observe --app Notepad 2>&1 | Out-String
+          $output = & ./target/debug/agent-desktop.exe observe --pid ${{ steps.notepad.outputs.PID }} 2>&1 | Out-String
           Write-Host $output
           if ($output -notmatch '<') { throw "Expected XML output" }
 
-      - name: "Test: observe --app Notepad --format json"
+      - name: "Test: observe --pid --format json"
         shell: pwsh
         run: |
-          $output = & ./target/debug/agent-desktop.exe observe --app Notepad --format json 2>&1 | Out-String
+          $output = & ./target/debug/agent-desktop.exe observe --pid ${{ steps.notepad.outputs.PID }} --format json 2>&1 | Out-String
           Write-Host ($output.Substring(0, [Math]::Min(500, $output.Length)))
           if ($output -notmatch '[\[\{]') { throw "Expected JSON output" }
 
-      - name: "Test: observe --app Notepad --list-roles"
+      - name: "Test: observe --pid --list-roles"
         shell: pwsh
         run: |
-          $output = & ./target/debug/agent-desktop.exe observe --app Notepad --list-roles 2>&1 | Out-String
+          $output = & ./target/debug/agent-desktop.exe observe --pid ${{ steps.notepad.outputs.PID }} --list-roles 2>&1 | Out-String
           Write-Host $output
           if ($output -notmatch '\d+') { throw "Expected role counts" }
 
-      - name: "Test: observe --app Notepad with query"
+      - name: "Test: observe --pid with query"
         shell: pwsh
         run: |
-          # First populate state
-          & ./target/debug/agent-desktop.exe observe --app Notepad 2>&1 | Out-Null
-          $output = & ./target/debug/agent-desktop.exe observe --app Notepad -q 'window' 2>&1 | Out-String
+          & ./target/debug/agent-desktop.exe observe --pid ${{ steps.notepad.outputs.PID }} 2>&1 | Out-Null
+          $output = & ./target/debug/agent-desktop.exe observe --pid ${{ steps.notepad.outputs.PID }} -q 'window' 2>&1 | Out-String
           Write-Host $output
           if ($output.Length -eq 0) { throw "Expected non-empty query result" }
 
       - name: "Test: interact press on element"
         shell: pwsh
         run: |
-          # Observe first to populate state and cache
-          & ./target/debug/agent-desktop.exe observe --app Notepad 2>&1 | Out-Null
-          # Try pressing element 2 (usually the window) — allow failure but shouldn't panic
-          $output = & ./target/debug/agent-desktop.exe interact --app Notepad --element 2 --action press 2>&1 | Out-String
+          & ./target/debug/agent-desktop.exe observe --pid ${{ steps.notepad.outputs.PID }} 2>&1 | Out-Null
+          # Try pressing element 2 — allow failure but shouldn't panic
+          $output = & ./target/debug/agent-desktop.exe interact --pid ${{ steps.notepad.outputs.PID }} --element 2 --action press 2>&1 | Out-String
           Write-Host $output
 
       # --- Tests for stubbed commands (should fail gracefully) ---
