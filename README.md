@@ -34,6 +34,16 @@ agent-desktop screenshot --output /tmp/screen.png              # Take a screensh
 
 ## Install
 
+### From crates.io
+
 ```
 cargo install agent-desktop
+```
+
+### From source
+
+```
+git clone https://github.com/anthropics/agent-desktop.git
+cd agent-desktop
+cargo install --path .
 ```
