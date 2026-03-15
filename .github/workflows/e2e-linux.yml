@@ -33,9 +33,6 @@ jobs:
             libatk1.0-0 \
             libatk-bridge2.0-0
 
-      - name: Build
-        run: cargo build --verbose
-
       - name: Start Xvfb, D-Bus, AT-SPI2, window manager, and GUI app
         run: |
           # Start virtual X display
@@ -75,97 +72,5 @@ jobs:
           pgrep -a mutter || echo "mutter not running"
           pgrep -a at-spi2 || echo "at-spi2 not running"
 
-      # --- Tests that should succeed ---
-
-      - name: "Test: screenshot captures a file"
-        run: |
-          ./target/debug/agent-desktop screenshot --output /tmp/screen.png
-          test -f /tmp/screen.png
-          SIZE=$(stat -c%s /tmp/screen.png)
-          test "$SIZE" -gt 100  # should be a real image
-
-      - name: "Test: observe returns XML with elements"
-        run: |
-          OUTPUT=$(./target/debug/agent-desktop observe 2>&1)
-          echo "$OUTPUT"
-          echo "$OUTPUT" | grep -q '<application'
-
-      - name: "Test: observe --app gedit returns elements"
-        run: |
-          OUTPUT=$(./target/debug/agent-desktop observe --app gedit 2>&1)
-          echo "$OUTPUT"
-          echo "$OUTPUT" | grep -q '<'
-
-      - name: "Test: observe --list-roles shows role counts"
-        run: |
-          OUTPUT=$(./target/debug/agent-desktop observe --list-roles 2>&1)
-          echo "$OUTPUT"
-          echo "$OUTPUT" | grep -qE '[a-z_]+.*[0-9]+'
-
-      - name: "Test: observe with query filter"
-        run: |
-          ./target/debug/agent-desktop observe --app gedit > /dev/null 2>&1 || true
-          OUTPUT=$(./target/debug/agent-desktop observe -q 'window' 2>&1)
-          echo "$OUTPUT"
-          test -n "$OUTPUT"
-
-      - name: "Test: observe JSON format"
-        run: |
-          OUTPUT=$(./target/debug/agent-desktop observe --app gedit --format json 2>&1)
-          echo "$OUTPUT" | head -5
-          echo "$OUTPUT" | head -1 | grep -qE '^\[|\{'
-
-      - name: "Test: focus --app gedit"
-        run: |
-          OUTPUT=$(./target/debug/agent-desktop focus --app gedit 2>&1)
-          echo "$OUTPUT"
-          echo "$OUTPUT" | grep -qi 'Focused'
-
-      - name: "Test: read --clipboard returns JSON"
-        run: |
-          # Seed clipboard first — xclip fails on empty clipboard
-          echo -n "test content" | xclip -selection clipboard
-          OUTPUT=$(./target/debug/agent-desktop read --clipboard 2>&1)
-          echo "$OUTPUT"
-          echo "$OUTPUT" | grep -q 'clipboard'
-
-      - name: "Test: click at coordinates"
-        run: |
-          ./target/debug/agent-desktop click --x 100 --y 100 2>&1
-          echo "Click succeeded"
-
-      - name: "Test: scroll down"
-        run: |
-          ./target/debug/agent-desktop scroll --direction down 2>&1
-          echo "Scroll succeeded"
-
-      - name: "Test: key press"
-        run: |
-          ./target/debug/agent-desktop key --name escape 2>&1
-          echo "Key press succeeded"
-
-      - name: "Test: type text"
-        run: |
-          ./target/debug/agent-desktop focus --app gedit > /dev/null 2>&1 || true
-          ./target/debug/agent-desktop type --text "hello from CI" 2>&1
-          echo "Type succeeded"
-
-      - name: "Test: observe then click element by query"
-        run: |
-          ./target/debug/agent-desktop observe --app gedit > /dev/null 2>&1
-          OUTPUT=$(./target/debug/agent-desktop click --app gedit -q 'window' 2>&1) || true
-          echo "$OUTPUT"
-
-      # --- Tests for expected failures ---
-
-      - name: "Test: observe with invalid app fails gracefully"
-        run: |
-          OUTPUT=$(./target/debug/agent-desktop observe --app NonExistentApp 2>&1) && exit 1 || true
-          echo "$OUTPUT"
-          echo "$OUTPUT" | grep -qi 'not found\|error'
-
-      - name: "Test: click without element or coords fails"
-        run: |
-          OUTPUT=$(./target/debug/agent-desktop click 2>&1) && exit 1 || true
-          echo "$OUTPUT"
-          echo "$OUTPUT" | grep -qi 'element\|required'
+      - name: Run e2e tests
+        run: cargo test --features e2e --test e2e_live --verbose

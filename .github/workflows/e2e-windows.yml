@@ -1,0 +1,34 @@
+name: E2E Windows
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  e2e-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Launch Notepad and save PID
+        id: notepad
+        shell: pwsh
+        run: |
+          Start-Process notepad
+          Start-Sleep -Seconds 2
+          $proc = Get-Process notepad -ErrorAction SilentlyContinue | Select-Object -First 1
+          Write-Host "Notepad PID: $($proc.Id), Title: $($proc.MainWindowTitle)"
+          echo "PID=$($proc.Id)" >> $env:GITHUB_OUTPUT
+
+      - name: Run e2e tests
+        env:
+          NOTEPAD_PID: ${{ steps.notepad.outputs.PID }}
+        run: cargo test --features e2e --test e2e_live --verbose
