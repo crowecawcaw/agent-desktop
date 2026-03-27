@@ -266,9 +266,3 @@ pub enum AppTarget {
     ByPid(u32),
 }
 
-/// Status of accessibility permissions
-#[derive(Debug)]
-pub enum PermissionStatus {
-    Granted,
-    Denied { instructions: String },
-}
