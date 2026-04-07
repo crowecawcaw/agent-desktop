@@ -16,16 +16,16 @@ anyhow = "1"
 
 # Linux AT-SPI2 accessibility
 [target.'cfg(target_os = "linux")'.dependencies]
-atspi = "0.22"
-zbus = "4"
+atspi = "0.29"
+zbus = "5"
 
 # macOS accessibility (core-foundation for FFI helpers)
 [target.'cfg(target_os = "macos")'.dependencies]
-core-foundation = "0.10"
+core-foundation = "0.10.1"
 
 # Windows UI Automation
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.58", features = [
+windows = { version = "0.62", features = [
     "Win32_UI_Accessibility",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Foundation",

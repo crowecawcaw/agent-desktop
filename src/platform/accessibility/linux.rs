@@ -169,8 +169,11 @@ async fn get_all_apps_tree_async(
         if elements.len() >= opts.max_elements as usize {
             break;
         }
-        let bus = child_ref.name.as_str();
-        let path = child_ref.path.as_str();
+        let bus = match child_ref.name() {
+            Some(n) => n.as_str(),
+            None => continue,
+        };
+        let path = child_ref.path().as_str();
 
         let app_name = if let Ok(proxy) = AccessibleProxy::builder(conn)
             .destination(bus)?
@@ -244,8 +247,11 @@ async fn get_app_tree_async(
     let mut target_name = String::new();
 
     for child_ref in &children {
-        let bus = child_ref.name.as_str();
-        let path = child_ref.path.as_str();
+        let bus = match child_ref.name() {
+            Some(n) => n.as_str(),
+            None => continue,
+        };
+        let path = child_ref.path().as_str();
 
         if let Ok(proxy) = AccessibleProxy::builder(conn)
             .destination(bus)?
@@ -367,10 +373,11 @@ async fn traverse_tree(
         if !role_filter.contains(&normalized_role) && depth > 0 {
             if let Ok(child_refs) = proxy.get_children().await {
                 for child_ref in &child_refs {
+                    let Some(child_bus) = child_ref.name().map(|n| n.as_str()) else { continue };
                     Box::pin(traverse_tree(
                         conn,
-                        child_ref.name.as_str(),
-                        child_ref.path.as_str(),
+                        child_bus,
+                        child_ref.path().as_str(),
                         opts,
                         elements,
                         id_counter,
@@ -527,12 +534,13 @@ async fn traverse_tree(
         if elements.len() >= opts.max_elements as usize {
             break;
         }
+        let Some(child_bus) = child_ref.name().map(|n| n.as_str()) else { continue };
         let child_start_id = *id_counter + 1;
 
         Box::pin(traverse_tree(
             conn,
-            child_ref.name.as_str(),
-            child_ref.path.as_str(),
+            child_bus,
+            child_ref.path().as_str(),
             opts,
             elements,
             id_counter,
@@ -574,7 +582,7 @@ async fn get_pid(conn: &zbus::Connection, bus_name: &str) -> Result<u32> {
 fn map_atspi_role(role: AtSpiRole) -> ElementRole {
     match role {
         AtSpiRole::Frame | AtSpiRole::Window => ElementRole::Window,
-        AtSpiRole::PushButton | AtSpiRole::PushButtonMenu => ElementRole::Button,
+        AtSpiRole::Button | AtSpiRole::PushButtonMenu => ElementRole::Button,
         AtSpiRole::Entry | AtSpiRole::PasswordText | AtSpiRole::SpinButton => {
             ElementRole::TextField
         }
