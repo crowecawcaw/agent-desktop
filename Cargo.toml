@@ -10,29 +10,13 @@ clap = { version = "4", features = ["derive"] }
 image = "0.25"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["full"] }
 dirs = "6"
 anyhow = "1"
+xa11y = "0.6"
 
-# Linux AT-SPI2 accessibility
-[target.'cfg(target_os = "linux")'.dependencies]
-atspi = "0.29"
-zbus = "5"
-
-# macOS accessibility (core-foundation for FFI helpers)
+# macOS platform helpers (screenshots, window bounds) — NOT for accessibility
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10.1"
-
-# Windows UI Automation
-[target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.62", features = [
-    "Win32_UI_Accessibility",
-    "Win32_UI_WindowsAndMessaging",
-    "Win32_Foundation",
-    "Win32_System_Com",
-    "Win32_System_Ole",
-    "Win32_System_Variant",
-] }
 
 [features]
 e2e = []
