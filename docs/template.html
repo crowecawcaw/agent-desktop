@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agent-desktop</title>
+<meta name="description" content="Desktop automation CLI for AI agents. Observe and interact with any UI via accessibility APIs.">
+<meta property="og:title" content="agent-desktop">
+<meta property="og:description" content="Desktop automation CLI for AI agents. Observe and interact with any UI via accessibility APIs.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+$body$
+<footer>
+  <span>MIT License</span>
+  <a href="https://github.com/anthropics/agent-desktop">GitHub</a>
+</footer>
+</div>
+<script>
+// Highlight CLI syntax in code blocks
+document.querySelectorAll('pre code').forEach(block => {
+  let html = block.innerHTML;
+  // Process line by line to avoid replacing inside already-wrapped spans
+  html = html.split('\n').map(line => {
+    // Comments
+    if (/^\s*#/.test(line)) {
+      return '<span class="hl-comment">' + line + '</span>';
+    }
+    // Command lines
+    line = line
+      // flags like --app, --query, --text, --x, --y, --output, --direction, --name, --element, --action, --list-roles, --clipboard, --format
+      .replace(/(--[\w-]+)/g, '<span class="hl-flag">$1</span>')
+      // strings in single or double quotes
+      .replace(/(&quot;[^&]*&quot;|&#39;[^&]*&#39;|"[^"]*"|'[^']*')/g, '<span class="hl-string">$1</span>')
+      // the main command at the start
+      .replace(/^(\s*)(agent-desktop\s+\w+)/, '$1<span class="hl-command">$2</span>')
+      // cargo install
+      .replace(/^(\s*)(cargo install\s+\S+)/, '$1<span class="hl-command">$2</span>');
+    return line;
+  }).join('\n');
+  block.innerHTML = html;
+});
+</script>
+</body>
+</html>
