@@ -23,6 +23,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install pandoc
+        run: sudo apt-get install -y pandoc
+
       - name: Build HTML from README
         run: |
           mkdir -p _site
