@@ -32,6 +32,7 @@ jobs:
             --metadata title="agent-desktop" \
             -o _site/index.html
           cp docs/style.css _site/style.css
+          cp docs/highlight.js _site/highlight.js
 
       - uses: actions/configure-pages@v5
 
