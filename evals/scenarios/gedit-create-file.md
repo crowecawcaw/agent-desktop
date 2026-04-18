@@ -7,7 +7,7 @@ requires:
   binaries: [agent-desktop]
   apps: [gedit]
   display_server: any
-  notes: "gedit/gnome-text-editor exposes text fields with AT-SPI value setting"
+  notes: "NOTE: as of 2026-04, gnome-text-editor (GTK4) on Mutter exposes a degenerate AT-SPI tree (no text-field roles, no actions). gedit (older GTK3) is the better target if installed; this scenario will likely be 'blocked' on stock GNOME 46+ until upstream a11y improves."
 ---
 
 # gedit: create a file with specific content
@@ -39,5 +39,5 @@ Exit 0 = pass. Exit 1 = file content differs. File missing = fail.
 
 ```bash
 rm -f /tmp/eval-hello.txt
-pkill -f "gedit\|gnome-text-editor" || true
+pkill -f '^gedit$|^gnome-text-editor$' || true
 ```

@@ -46,7 +46,7 @@ If both checks fail but the agent reported a near-correct value, record it as a 
 ## Reset / cleanup
 
 ```bash
-pkill gnome-calculator || true
+pkill -f '^gnome-calculator$' || true
 ```
 
 ## NOTE

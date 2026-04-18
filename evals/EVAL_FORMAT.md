@@ -104,8 +104,8 @@ The distinction between `failed` and `blocked` is **critical for grading**. `fai
 
 Before handing the prompt to the agent, the runner (or the agent itself, as its first step) MUST run a pre-flight that checks `requires:`:
 
-- Each binary in `requires.binaries` resolves on `$PATH`.
-- Each app in `requires.apps` is installed (`which`, package check, or `--version` probe).
+- Each binary in `requires.binaries` resolves on `$PATH` (verify it exists and is callable, e.g. `command -v agent-desktop` or `agent-desktop --help >/dev/null 2>&1` — note that `agent-desktop` does not implement a `--version` flag).
+- Each app in `requires.apps` is installed (`which` or package check; do not rely on `--version` probes since not every binary implements it).
 - The current display server matches `requires.display_server`.
 
 If pre-flight fails, the run is reported as `blocked` with the missing requirement named — **do not proceed to the prompt**. This keeps environmental misses out of the agent's failure rate.

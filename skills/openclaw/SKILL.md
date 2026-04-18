@@ -205,7 +205,7 @@ Runtime requirements:
 - `xclip` for clipboard read on X11.
 - `scrot` (X11) or `grim` (sway) for screenshots.
 
-**ydotool note**: if you need keyboard/mouse simulation on GNOME/Wayland, install `ydotool` AND set up `ydotoold` as a systemd service. The package install does not configure the daemon. Without the daemon running, ydotool input is unavailable. This is out of scope for `cargo install agent-desktop` but worth knowing if input fallback is required.
+**ydotool note**: if you need keyboard/mouse simulation on GNOME/Wayland, install `ydotool` AND set up `ydotoold` as a systemd service. The package install does not configure the daemon. Note: `ydotoold` may already be running but lack `/dev/uinput` permissions (run as root or add a udev rule to grant access — out of scope here). Without that perms gap closed, ydotool input is unavailable even with the daemon up. This is out of scope for `cargo install agent-desktop` but worth knowing if input fallback is required.
 
 ## Author
 
