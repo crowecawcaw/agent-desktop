@@ -204,3 +204,48 @@ fn test_scroll_without_element_no_state_needed() {
 
     result.stderr(predicate::str::contains("xdotool").or(predicate::str::contains("screenshot tool").or(predicate::str::contains("scroll"))));
 }
+
+// =============================================================================
+// Observe --format default (issue #21)
+// =============================================================================
+
+#[test]
+fn observe_help_documents_json_as_default() {
+    agent_desktop_cmd()
+        .args(["observe", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--format").and(predicate::str::contains("json")));
+}
+
+#[test]
+fn observe_default_format_is_json() {
+    // The default output of `observe` should be JSON, not XML.
+    let output = agent_desktop_cmd()
+        .args(["observe"])
+        .output()
+        .expect("agent-desktop should run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim_start();
+    assert!(
+        !trimmed.starts_with("<"),
+        "expected JSON default but got XML-shaped output: {}",
+        &trimmed[..trimmed.len().min(80)]
+    );
+}
+
+#[test]
+fn observe_with_explicit_xml_still_works() {
+    // Backward-compat: --format xml must still work after the default flip.
+    let output = agent_desktop_cmd()
+        .args(["observe", "--format", "xml"])
+        .output()
+        .expect("agent-desktop should run with explicit format");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim_start();
+    assert!(
+        trimmed.starts_with("<"),
+        "expected XML output with --format xml but got: {}",
+        &trimmed[..trimmed.len().min(80)]
+    );
+}
