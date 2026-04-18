@@ -14,13 +14,53 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="container">
-$body$
-<footer>
-  <span>MIT License</span>
-  <a href="https://github.com/crowecawcaw/agent-desktop">GitHub</a>
-</footer>
+<div class="shell">
+  <aside class="toc">
+    <div class="toc-group">
+      <h5>Overview</h5>
+      <a href="#install">Install</a>
+      <a href="#features">Features</a>
+      <a href="#works-with">Works with</a>
+    </div>
+    <div class="toc-group">
+      <h5>Reference</h5>
+      <a href="#example">Example</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#commands">Commands</a>
+    </div>
+    <div class="toc-group">
+      <h5>Platform</h5>
+      <a href="#platforms">Platforms</a>
+      <a href="#license">License</a>
+    </div>
+  </aside>
+  <main>
+    $body$
+    <footer>
+      <span>MIT License</span>
+      <a href="https://github.com/crowecawcaw/agent-desktop">GitHub</a>
+    </footer>
+  </main>
 </div>
 <script src="highlight.js"></script>
+<script>
+  const tocLinks = Array.from(document.querySelectorAll('.toc a'));
+  const sections = tocLinks
+    .map(a => document.querySelector(a.getAttribute('href')))
+    .filter(Boolean);
+  if (sections.length) {
+    const byId = new Map(sections.map(s => [s.id, tocLinks.find(a => a.getAttribute('href') === '#' + s.id)]));
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          tocLinks.forEach(a => a.classList.remove('active'));
+          const link = byId.get(e.target.id);
+          if (link) link.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-30% 0px -60% 0px' });
+    sections.forEach(s => obs.observe(s));
+  }
+</script>
 </body>
 </html>
