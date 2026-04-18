@@ -23,19 +23,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install pandoc
-        run: sudo apt-get install -y pandoc
-
-      - name: Build HTML from README
+      - name: Build site
         run: |
           mkdir -p _site
-          pandoc README.md \
-            --standalone \
-            --template docs/template.html \
-            --metadata title="agent-desktop" \
-            -o _site/index.html
+          cp docs/index.html _site/index.html
           cp docs/style.css _site/style.css
-          cp docs/highlight.js _site/highlight.js
 
       - uses: actions/configure-pages@v5
 

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agent-desktop — Desktop automation CLI for AI agents</title>
+<meta name="description" content="Desktop automation CLI for AI agents. Observe and interact with any UI via accessibility APIs.">
+<meta property="og:title" content="agent-desktop">
+<meta property="og:description" content="Desktop automation CLI for AI agents. Observe and interact with any UI via accessibility APIs.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="shell">
+
+  <aside class="toc">
+    <div class="toc-group">
+      <h5>Overview</h5>
+      <a href="#top" class="active">Introduction</a>
+      <a href="#install">Install</a>
+
+      <a href="#usage">Usage</a>
+    </div>
+    <div class="toc-group">
+      <h5>Reference</h5>
+      <a href="#example">Example</a>
+      <a href="#how">How it works</a>
+      <a href="#commands">Commands</a>
+      <a href="#selectors">Selectors</a>
+    </div>
+    <div class="toc-group">
+      <h5>Platform</h5>
+      <a href="#platforms">Platforms</a>
+      <a href="#license">License</a>
+    </div>
+  </aside>
+
+  <main id="top">
+
+    <div class="lede">
+      <h1>Observe and interact with any UI, <em>from the command line.</em></h1>
+      <p class="sub">
+        A desktop automation CLI designed for AI agents. Reads the OS accessibility tree,
+        targets elements with CSS-like selectors, and exposes click, type, scroll, and screenshot
+        as shell commands. macOS, Linux, and Windows. Native Rust, single binary.
+      </p>
+      <div class="meta-row">
+        <span class="chip">macOS · Linux · Windows</span>
+
+        <span class="chip">MIT licensed</span>
+      </div>
+    </div>
+
+    <section id="install">
+      <h2>Install</h2>
+      <pre class="code"><code><span class="c"># via cargo</span>
+cargo install agent-desktop
+
+<span class="c"># verify</span>
+agent-desktop --version</code></pre>
+    </section>
+
+    <section id="usage">
+      <h2>Usage</h2>
+      <p>Add the following to your agent's system prompt or instructions:</p>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt</div>
+        <div class="prompt-body">You have access to <code>agent-desktop</code>, a CLI for desktop automation via accessibility APIs. Run <code>agent-desktop --help</code> to see available commands. Use it to observe, click, type, scroll, and screenshot any application on the user's desktop. Start by observing the screen to understand what's visible, then interact with elements using their IDs or CSS-like selectors.</div>
+      </div>
+    </section>
+
+    <section id="example">
+      <h2>Example</h2>
+      <pre class="code"><code><span class="c"># List all running apps</span>
+agent-desktop observe
+
+<span class="c"># Get the accessibility tree for a specific app</span>
+agent-desktop observe --app Safari
+
+<span class="c"># Filter with CSS-like selectors</span>
+agent-desktop observe --app Safari --query 'button[name="OK"]'
+
+<span class="c"># Interact</span>
+agent-desktop click --app Safari --query 'button[name="OK"]'
+agent-desktop type --text "hello world"
+agent-desktop screenshot --output /tmp/screen.png</code></pre>
+    </section>
+
+    <section id="how">
+      <h2>How it works</h2>
+      <ol>
+        <li><code>observe</code> — query the accessibility tree, get structured element data back.</li>
+        <li>Use element IDs or selectors to click, type, scroll, or send a keystroke.</li>
+        <li>Re-observe after each action to get updated state.</li>
+      </ol>
+    </section>
+
+    <section id="commands">
+      <h2>Commands</h2>
+      <div class="cmd-table">
+        <div class="cmd-row"><code>observe</code><div class="desc">List apps, read the accessibility tree, filter with selectors, show role distribution.</div></div>
+        <div class="cmd-row"><code>click</code><div class="desc">By element, selector, or absolute coordinates.</div></div>
+        <div class="cmd-row"><code>type</code><div class="desc">At cursor, or into a specific element via <code>--query</code>.</div></div>
+        <div class="cmd-row"><code>scroll</code><div class="desc">Direction, amount, target element.</div></div>
+        <div class="cmd-row"><code>key</code><div class="desc">Single key or combo, e.g. <code>cmd+n</code>.</div></div>
+        <div class="cmd-row"><code>focus</code><div class="desc">Bring an app to the foreground.</div></div>
+        <div class="cmd-row"><code>read</code><div class="desc">Element text or value; also the system clipboard.</div></div>
+        <div class="cmd-row"><code>wait</code><div class="desc">Block until a selector resolves.</div></div>
+        <div class="cmd-row"><code>interact</code><div class="desc">Invoke a native accessibility action directly.</div></div>
+        <div class="cmd-row"><code>screenshot</code><div class="desc">Write a PNG to disk.</div></div>
+      </div>
+    </section>
+
+    <section id="selectors">
+      <h2>Selectors</h2>
+      <p>The <code>--query</code> flag accepts CSS-like selectors for targeting elements in the accessibility tree.</p>
+
+      <h3>By role</h3>
+      <pre class="code"><code>agent-desktop observe --app Safari --query 'button'
+agent-desktop observe --app Safari --query 'text_field'
+agent-desktop observe --app Safari --query 'menu_item'</code></pre>
+
+      <h3>By attribute</h3>
+      <p>Supported attributes: <code>name</code>, <code>value</code>, <code>description</code>, <code>role</code>.</p>
+      <div class="cmd-table">
+        <div class="cmd-row"><code>[name="Submit"]</code><div class="desc">Exact match on name.</div></div>
+        <div class="cmd-row"><code>[name*="addr"]</code><div class="desc">Substring match (case-insensitive).</div></div>
+        <div class="cmd-row"><code>[name^="addr"]</code><div class="desc">Starts-with match (case-insensitive).</div></div>
+        <div class="cmd-row"><code>[value="foo"]</code><div class="desc">Match by value attribute.</div></div>
+      </div>
+
+      <h3>Combinators</h3>
+      <div class="cmd-table" style="margin-bottom: 16px;">
+        <div class="cmd-row"><code>toolbar > text_field</code><div class="desc">Direct child — text_field must be an immediate child of toolbar.</div></div>
+        <div class="cmd-row"><code>toolbar text_field</code><div class="desc">Descendant — text_field anywhere inside toolbar.</div></div>
+      </div>
+
+      <h3>Nth matching</h3>
+      <pre class="code"><code><span class="c"># Click the 2nd button (1-based index)</span>
+agent-desktop click --app Safari --query 'button:nth(2)'</code></pre>
+
+      <h3>Combined</h3>
+      <pre class="code"><code><span class="c"># Text field named "Address" inside a toolbar</span>
+agent-desktop observe --app Safari --query 'toolbar > text_field[name*="Address"]'
+
+<span class="c"># 3rd menu item with "File" in the name</span>
+agent-desktop click --app Finder --query 'menu_item[name^="File"]:nth(3)'</code></pre>
+    </section>
+
+    <section id="platforms">
+      <h2>Platforms</h2>
+      <div class="platforms">
+        <div class="plat">
+          <div class="pname">macOS</div>
+          <div class="parch">arm64 · x64</div>
+          <div class="papi">Accessibility API: <span>AXUIElement</span></div>
+        </div>
+        <div class="plat">
+          <div class="pname">Linux</div>
+          <div class="parch">x64</div>
+          <div class="papi">Accessibility API: <span>AT-SPI2 via D-Bus</span></div>
+        </div>
+        <div class="plat">
+          <div class="pname">Windows</div>
+          <div class="parch">x64</div>
+          <div class="papi">Accessibility API: <span>UI Automation</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="license">
+      <h2>License</h2>
+      <p>MIT. Source on <a href="https://github.com/crowecawcaw/agent-desktop">GitHub</a>.</p>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <span>agent-desktop</span>
+  <span class="sep">·</span>
+  <a href="https://github.com/crowecawcaw/agent-desktop">GitHub</a>
+  <span class="spacer"></span>
+  <span>MIT</span>
+</footer>
+
+<script>
+  // TOC active-section tracking
+  const tocLinks = Array.from(document.querySelectorAll('.toc a'));
+  const sections = tocLinks
+    .map(a => document.querySelector(a.getAttribute('href')))
+    .filter(Boolean);
+  const byId = new Map(sections.map(s => [s.id, tocLinks.find(a => a.getAttribute('href') === '#' + s.id)]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        tocLinks.forEach(a => a.classList.remove('active'));
+        const link = byId.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>
