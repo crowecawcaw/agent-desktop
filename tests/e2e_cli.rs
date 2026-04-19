@@ -220,18 +220,42 @@ fn observe_help_documents_json_as_default() {
 
 #[test]
 fn observe_default_format_is_json() {
-    // The default output of `observe` should be JSON, not XML.
+    // The default output of `observe` should be valid JSON, not XML.
+    // A weak "doesn't start with <" check is not enough — empty output
+    // or an error banner would pass that. We assert the command succeeds
+    // AND that stdout parses as a JSON value.
     let output = agent_desktop_cmd()
         .args(["observe"])
         .output()
         .expect("agent-desktop should run");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let trimmed = stdout.trim_start();
+
     assert!(
-        !trimmed.starts_with("<"),
-        "expected JSON default but got XML-shaped output: {}",
-        &trimmed[..trimmed.len().min(80)]
+        output.status.success(),
+        "observe should exit 0; got status={:?}, stderr={}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
     );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    assert!(!trimmed.is_empty(), "expected non-empty stdout");
+
+    let parsed: serde_json::Value = serde_json::from_str(trimmed).unwrap_or_else(|e| {
+        panic!(
+            "expected JSON default but parse failed: {}\nfirst 200 chars of stdout: {}",
+            e,
+            &trimmed[..trimmed.len().min(200)]
+        )
+    });
+
+    // Sanity: the parsed value should be either an object with fields or a
+    // non-empty array. We don't assume a specific shape — that's another test.
+    let non_empty = match &parsed {
+        serde_json::Value::Object(m) => !m.is_empty(),
+        serde_json::Value::Array(a) => !a.is_empty(),
+        _ => true, // bare scalar is unexpected but technically valid JSON
+    };
+    assert!(non_empty, "parsed JSON should not be an empty object/array");
 }
 
 #[test]
