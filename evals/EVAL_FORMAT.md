@@ -80,25 +80,35 @@ pkill -f gedit || true
 When the agent finishes (or aborts) a scenario, it MUST report in this shape:
 
 ```
-Outcome: success | partial | failed | blocked
+Outcome: <one of below>
 Reported value: <whatever the prompt asks for, or "n/a">
-Blocker (if blocked): <e.g. "ydotool daemon not running" — environmental, not agent capability>
+Path used: <tree | key | click-coord | clipboard | composite>
+Blocker (if blocked): <specific reason, e.g. "observe returned 22 group nodes, no actionable roles; key, click-coord, clipboard all attempted (see trace)">
 Trace: brief chronological log of commands run
 Friction: anything that wasted turns (degenerate trees, missing flags, surprising errors)
 ```
 
-### Outcome definitions
+### Outcome values
 
-- **`success`** — verification passes. Agent did the task.
-- **`partial`** — agent made meaningful progress but verification doesn't fully pass (e.g. answer reported but file not saved).
-- **`failed`** — agent could have done the task but didn't (wrong commands, gave up early, hallucinated state).
-- **`blocked`** — the **environment** prevented completion. The agent's reasoning was sound but the tool/OS/app couldn't deliver. Examples:
-  - `ydotool daemon not running` and the scenario needs input simulation on Wayland.
-  - GTK4 app exposes degenerate accessibility tree (no actionable elements).
-  - `agent-desktop` binary missing.
-  - Required app not installed.
+- **`success`** — task completed via the **canonical (tree-based) path**: `observe` → `interact --action` (or `type --element`, `focus --element`, `read --element`) → verification passes.
+- **`success-via-fallback`** — task completed, but via a **non-tree path**: keyboard simulation (`key --app` / `key --name`), coordinate click (`click --x --y`), or clipboard read (`read --clipboard`). Document which path in `Path used`. This is still a success, but the maintainer should know the tree path didn't carry the run — useful signal for upstream a11y fixes.
+- **`partial`** — agent made meaningful progress but verification doesn't fully pass (e.g. answer reported but file not saved). Agent reports what it could.
+- **`blocked-tree-inaccessible`** — `observe` returned a degenerate tree (the canary case: ~25 `group`/`unknown` nodes, no actionable roles). The agent did **not** exhaust non-tree paths. Use this **only** if the scenario's prompt explicitly limits to the tree path, or the scenario explicitly accepts this outcome.
+- **`blocked-all-paths-exhausted`** — agent attempted all four canonical paths (tree, keyboard, coordinate click, clipboard) and none worked. Each attempt MUST be documented in `Trace`. This is the strongest "the environment defeats us" signal.
+- **`failed`** — agent had a viable path but the result didn't match expected outcome (wrong answer reported, wrong file saved, hallucinated state). Distinct from `blocked-*` because the agent **could have** completed but didn't.
 
-The distinction between `failed` and `blocked` is **critical for grading**. `failed` means iterate on the agent (better skill, better prompt). `blocked` means iterate on the environment or the scenario (different app, daemon setup, upstream bug fix).
+The distinction between `failed` and `blocked-*` is **critical for grading**. `failed` means iterate on the agent (better skill, better prompt). `blocked-*` means iterate on the environment or the scenario (different app, daemon setup, upstream bug fix). The split between `blocked-tree-inaccessible` and `blocked-all-paths-exhausted` tells the maintainer whether the agent is giving up too early or whether the environment really is unworkable.
+
+### Pre-flight responsibility (agent-side)
+
+Before declaring `blocked-tree-inaccessible` or `blocked-all-paths-exhausted`, the agent MUST attempt at minimum:
+
+1. **Tree path** — `observe --app <name>`, then `interact --action` / `click --query` / `type --element`.
+2. **Keyboard path** — `key --app <name> --name <combo>` for known shortcuts (`Ctrl+S`, `Ctrl+N`, `Tab`, `Enter`, digits for calculator, etc.). Most apps respond to standard shortcuts regardless of tree exposure.
+3. **Coordinate path** — if a screenshot reveals button positions (`screenshot --output /tmp/x.png` then visually parse), use `click --x --y`.
+4. **Clipboard path** — for verification or extracting values, `read --clipboard` after a known clipboard-modifying action (e.g. `Ctrl+C` after selecting display text).
+
+Only after all four fail does `blocked-all-paths-exhausted` apply. If the scenario explicitly accepts `blocked-tree-inaccessible` (rare — only when the scenario is itself a tree-availability canary), the agent may stop after step 1.
 
 ## Pre-flight check responsibility
 

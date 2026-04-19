@@ -51,11 +51,16 @@ pkill -f '^gnome-calculator$' || true
 
 ## NOTE
 
-`gnome-calculator` is a GTK4 app and is **known to expose a degenerate accessibility tree** — typically ~25 nodes, all `group`/`unknown`, all marked disabled, no button roles, no actions, no readable display text. As of 2026-04 this scenario is expected to be `blocked` on Linux until the GTK4 a11y issue is resolved upstream.
+`gnome-calculator` is a GTK4 app and is **known to expose a degenerate accessibility tree** — typically ~25 nodes, all `group`/`unknown`, all marked disabled, no button roles, no actions, no readable display text. As of 2026-04 the tree path is expected to be a dead end on stock GNOME — but the calculator buttons have a known visible grid layout and the app responds to standard digit/operator key input, so non-tree paths are theoretically viable.
 
-**Acceptable outcomes for this scenario**:
+**Before declaring blocked, the agent MUST attempt non-tree paths**: keyboard navigation (`key --app gnome-calculator --name 1`, etc.), coordinate clicks based on a screenshot of the visible button grid (`screenshot --output /tmp/calc.png` then `click --x --y`), and clipboard verification (`Ctrl+C` then `read --clipboard`). See EVAL_FORMAT.md "Pre-flight responsibility" for the required path order.
 
-- `success` — the tree exposed actionable buttons and a readable display, the agent computed and reported `56088`.
-- `blocked-with-tree-investigation` — the agent ran `observe --app gnome-calculator --list-roles`, confirmed the tree is degenerate (no button/text-field roles), and reported `blocked` with the tree summary as the blocker.
+**Acceptable outcomes for this scenario** (per EVAL_FORMAT.md taxonomy):
 
-A bare `failed` here likely indicates the agent did not investigate the tree; treat as a SKILL.md regression rather than a real attempt.
+- `success` — buttons exposed via tree, agent computed and reported `56088` via `interact --action press`.
+- `success-via-fallback` — agent used a non-tree path (e.g., `key --app gnome-calculator --name 1` for digits, coordinate clicks against a screenshot of the button grid, `read --clipboard` after `Ctrl+C` on the display). Document the path in the `Path used` field.
+- `blocked-all-paths-exhausted` — agent attempted tree path, keyboard navigation, coordinate clicks (with screenshot reference), and clipboard read, and got nothing actionable. All four attempts documented in the trace.
+- `partial` — agent computed something but mis-reported the result (e.g., reported `56,088.0` and harness rejects it, or reported intermediate state).
+- `failed` — agent reported a wrong number for reasons other than environment issues.
+
+A bare `blocked-tree-inaccessible` is **NOT acceptable** for this scenario — gnome-calculator has known visible button positions and standard keyboard input, so coordinate clicks and keyboard input are theoretically viable. The agent must at least attempt them before declaring blocked.
