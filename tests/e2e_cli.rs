@@ -196,13 +196,17 @@ fn test_scroll_invalid_direction() {
 
 #[test]
 fn test_scroll_without_element_no_state_needed() {
-    // Scroll without --element should not require state, only platform tools
-    let result = agent_desktop_cmd()
+    // Scroll without --element should not require state.
+    // On platforms with native input simulation (macOS/Windows/X11) it succeeds;
+    // on Wayland it fails with an unsupported-platform error rather than a
+    // missing-state error.
+    let assert = agent_desktop_cmd()
         .args(["scroll", "--direction", "up"])
-        .assert()
-        .failure();
+        .assert();
 
-    result.stderr(predicate::str::contains("xdotool").or(predicate::str::contains("screenshot tool").or(predicate::str::contains("scroll"))));
+    assert
+        .stderr(predicate::str::contains("state").not())
+        .stderr(predicate::str::contains("observe").not());
 }
 
 // =============================================================================

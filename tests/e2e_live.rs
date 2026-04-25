@@ -51,7 +51,7 @@ fn screenshot_captures_a_file() {
 #[cfg(target_os = "linux")]
 fn observe_returns_xml() {
     agent_desktop()
-        .arg("observe")
+        .args(["observe", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<application"));
@@ -61,7 +61,7 @@ fn observe_returns_xml() {
 #[cfg(target_os = "macos")]
 fn observe_returns_xml() {
     agent_desktop()
-        .arg("observe")
+        .args(["observe", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<application"));
@@ -71,7 +71,7 @@ fn observe_returns_xml() {
 #[cfg(target_os = "linux")]
 fn observe_app_returns_elements() {
     agent_desktop()
-        .args(["observe", "--app", "gedit"])
+        .args(["observe", "--app", "gedit", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<"));
@@ -81,7 +81,7 @@ fn observe_app_returns_elements() {
 #[cfg(target_os = "macos")]
 fn observe_app_finder_returns_elements() {
     agent_desktop()
-        .args(["observe", "--app", "Finder"])
+        .args(["observe", "--app", "Finder", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<application"))
@@ -92,7 +92,7 @@ fn observe_app_finder_returns_elements() {
 #[cfg(target_os = "macos")]
 fn observe_app_textedit_returns_elements() {
     agent_desktop()
-        .args(["observe", "--app", "TextEdit"])
+        .args(["observe", "--app", "TextEdit", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<"));
@@ -102,7 +102,7 @@ fn observe_app_textedit_returns_elements() {
 #[cfg(target_os = "windows")]
 fn observe_pid_returns_elements() {
     agent_desktop()
-        .args(["observe", "--pid", &notepad_pid()])
+        .args(["observe", "--pid", &notepad_pid(), "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<"));
@@ -185,7 +185,7 @@ fn observe_invalid_app_fails() {
 #[cfg(target_os = "windows")]
 fn observe_returns_xml() {
     agent_desktop()
-        .arg("observe")
+        .args(["observe", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<application"));
@@ -435,7 +435,7 @@ fn interact_press_on_element() {
 #[cfg(target_os = "macos")]
 fn observe_textedit_returns_elements() {
     agent_desktop()
-        .args(["observe", "--app", "TextEdit"])
+        .args(["observe", "--app", "TextEdit", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<"));
