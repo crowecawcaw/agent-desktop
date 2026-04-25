@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::platform;
 use crate::state::AppState;
@@ -10,7 +10,6 @@ pub fn run_scroll(
     direction: &str,
     amount: Option<u32>,
 ) -> Result<()> {
-    // Validate direction
     match direction {
         "up" | "down" | "left" | "right" => {}
         _ => anyhow::bail!(
@@ -19,21 +18,17 @@ pub fn run_scroll(
         ),
     }
 
-    // If element specified, move mouse to its center
-    if let Some(eid) = element_id {
+    // Resolve element center to use as the scroll target point.
+    let at = if let Some(eid) = element_id {
         let state = AppState::load()?;
         let elem = state.get_element(eid)?;
-        if let Some(ref bounds) = elem.bounds {
-            let (x, y) = bounds.center();
-            platform::move_mouse(x, y).context(format!(
-                "Failed to move mouse to element {} at ({}, {})",
-                eid, x, y
-            ))?;
-        }
-    }
+        elem.bounds.as_ref().map(|b| b.center())
+    } else {
+        None
+    };
 
     let scroll_amount = amount.unwrap_or(DEFAULT_SCROLL_AMOUNT);
-    platform::scroll(direction, scroll_amount)?;
+    platform::scroll(direction, scroll_amount, at)?;
 
     if let Some(eid) = element_id {
         println!("Scrolled {} {} clicks in element {}", direction, scroll_amount, eid);
