@@ -64,8 +64,8 @@ enum Commands {
         #[arg(long)]
         include_hidden: bool,
 
-        /// Output format: xml (default) or json
-        #[arg(long, default_value = "xml")]
+        /// Output format: json (default) or xml
+        #[arg(long, default_value = "json")]
         format: String,
 
         /// Include platform-specific raw attributes in output
