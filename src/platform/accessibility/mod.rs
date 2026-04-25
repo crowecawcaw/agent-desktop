@@ -430,7 +430,7 @@ fn map_xa11y_error(e: xa11y::Error) -> anyhow::Error {
 }
 
 /// Detect screen resolution using platform-specific tools.
-fn get_screen_size() -> (u32, u32) {
+pub fn get_screen_size() -> (u32, u32) {
     #[cfg(target_os = "linux")]
     {
         if let Some(size) = get_screen_size_linux() {

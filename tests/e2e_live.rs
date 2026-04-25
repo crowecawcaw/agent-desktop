@@ -32,7 +32,6 @@ fn notepad_pid() -> String {
 // =============================================================================
 
 #[test]
-#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn screenshot_captures_a_file() {
     let tmp = tempfile::TempDir::new().unwrap();
     let output = tmp.path().join("screen.png");
@@ -44,16 +43,6 @@ fn screenshot_captures_a_file() {
     assert!(meta.len() > 100, "screenshot should be a real image");
 }
 
-#[test]
-#[cfg(target_os = "windows")]
-fn screenshot_fails_gracefully_on_windows() {
-    agent_desktop()
-        .args(["screenshot", "--output", "C:\\Temp\\screen.png"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not supported"));
-}
-
 // =============================================================================
 // Observe
 // =============================================================================
@@ -62,7 +51,7 @@ fn screenshot_fails_gracefully_on_windows() {
 #[cfg(target_os = "linux")]
 fn observe_returns_xml() {
     agent_desktop()
-        .arg("observe")
+        .args(["observe", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<application"));
@@ -72,7 +61,7 @@ fn observe_returns_xml() {
 #[cfg(target_os = "macos")]
 fn observe_returns_xml() {
     agent_desktop()
-        .arg("observe")
+        .args(["observe", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<application"));
@@ -82,7 +71,7 @@ fn observe_returns_xml() {
 #[cfg(target_os = "linux")]
 fn observe_app_returns_elements() {
     agent_desktop()
-        .args(["observe", "--app", "gedit"])
+        .args(["observe", "--app", "gedit", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<"));
@@ -92,7 +81,7 @@ fn observe_app_returns_elements() {
 #[cfg(target_os = "macos")]
 fn observe_app_finder_returns_elements() {
     agent_desktop()
-        .args(["observe", "--app", "Finder"])
+        .args(["observe", "--app", "Finder", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<application"))
@@ -103,7 +92,7 @@ fn observe_app_finder_returns_elements() {
 #[cfg(target_os = "macos")]
 fn observe_app_textedit_returns_elements() {
     agent_desktop()
-        .args(["observe", "--app", "TextEdit"])
+        .args(["observe", "--app", "TextEdit", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<"));
@@ -113,7 +102,7 @@ fn observe_app_textedit_returns_elements() {
 #[cfg(target_os = "windows")]
 fn observe_pid_returns_elements() {
     agent_desktop()
-        .args(["observe", "--pid", &notepad_pid()])
+        .args(["observe", "--pid", &notepad_pid(), "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<"));
@@ -196,7 +185,7 @@ fn observe_invalid_app_fails() {
 #[cfg(target_os = "windows")]
 fn observe_returns_xml() {
     agent_desktop()
-        .arg("observe")
+        .args(["observe", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<application"));
@@ -298,22 +287,11 @@ fn read_clipboard_fails_gracefully_on_windows() {
 // =============================================================================
 
 #[test]
-#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn click_at_coordinates() {
     agent_desktop()
         .args(["click", "--x", "100", "--y", "100"])
         .assert()
         .success();
-}
-
-#[test]
-#[cfg(target_os = "windows")]
-fn click_fails_gracefully_on_windows() {
-    agent_desktop()
-        .args(["click", "--x", "100", "--y", "100"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not supported"));
 }
 
 #[test]
@@ -367,7 +345,6 @@ fn click_element_by_query() {
 // =============================================================================
 
 #[test]
-#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn scroll_down() {
     agent_desktop()
         .args(["scroll", "--direction", "down"])
@@ -375,37 +352,16 @@ fn scroll_down() {
         .success();
 }
 
-#[test]
-#[cfg(target_os = "windows")]
-fn scroll_fails_gracefully_on_windows() {
-    agent_desktop()
-        .args(["scroll", "--direction", "down"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not supported"));
-}
-
 // =============================================================================
 // Key press
 // =============================================================================
 
 #[test]
-#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn key_press() {
     agent_desktop()
         .args(["key", "--name", "escape"])
         .assert()
         .success();
-}
-
-#[test]
-#[cfg(target_os = "windows")]
-fn key_press_fails_gracefully_on_windows() {
-    agent_desktop()
-        .args(["key", "--name", "escape"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not supported"));
 }
 
 // =============================================================================
@@ -440,12 +396,11 @@ fn type_text() {
 
 #[test]
 #[cfg(target_os = "windows")]
-fn type_text_fails_gracefully_on_windows() {
+fn type_text() {
     agent_desktop()
-        .args(["type", "--text", "hello"])
+        .args(["type", "--text", "hello from CI"])
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("not supported"));
+        .success();
 }
 
 // =============================================================================
@@ -480,7 +435,7 @@ fn interact_press_on_element() {
 #[cfg(target_os = "macos")]
 fn observe_textedit_returns_elements() {
     agent_desktop()
-        .args(["observe", "--app", "TextEdit"])
+        .args(["observe", "--app", "TextEdit", "--format", "xml"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<"));
