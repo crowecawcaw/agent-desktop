@@ -222,6 +222,7 @@ fn observe_help_documents_json_as_default() {
         .stdout(predicate::str::contains("--format").and(predicate::str::contains("json")));
 }
 
+#[cfg(feature = "e2e")]
 #[test]
 fn observe_default_format_is_json() {
     // The default output of `observe` should be valid JSON, not XML.
@@ -262,6 +263,7 @@ fn observe_default_format_is_json() {
     assert!(non_empty, "parsed JSON should not be an empty object/array");
 }
 
+#[cfg(feature = "e2e")]
 #[test]
 fn observe_with_explicit_xml_still_works() {
     // Backward-compat: --format xml must still work after the default flip.
