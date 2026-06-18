@@ -3,208 +3,221 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>agent-desktop — Desktop automation CLI for AI agents</title>
-<meta name="description" content="Desktop automation CLI for AI agents. Observe and interact with any UI via accessibility APIs.">
+<title>agent-desktop — Desktop agent CLI + MCP built on xa11y</title>
+<meta name="description" content="A CLI and MCP server for driving native desktop apps. Built on xa11y — the cross-platform accessibility library. Use it as-is, or use the source to build your own.">
 <meta property="og:title" content="agent-desktop">
-<meta property="og:description" content="Desktop automation CLI for AI agents. Observe and interact with any UI via accessibility APIs.">
+<meta property="og:description" content="A CLI and MCP server for driving native desktop apps, built on xa11y.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="shell">
+<header class="site-header">
+  <a class="wordmark" href="/">agent-desktop</a>
+  <nav class="site-nav">
+    <a href="#how-it-works">how it works</a>
+    <a href="#install">install</a>
+    <a href="https://xa11y.dev">xa11y.dev</a>
+    <a href="https://github.com/crowecawcaw/agent-desktop" class="nav-gh">GitHub</a>
+  </nav>
+</header>
 
-  <aside class="toc">
-    <div class="toc-group">
-      <h5>Overview</h5>
-      <a href="#top" class="active">Introduction</a>
-      <a href="#install">Install</a>
+<main class="page">
 
-      <a href="#usage">Usage</a>
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <div class="eyebrow">Built on <a href="https://xa11y.dev">xa11y</a></div>
+    <h1>A reference desktop<br>agent tool</h1>
+    <p class="sub">
+      A working CLI and MCP server for controlling native desktop apps
+      through the accessibility tree — on macOS, Windows, and Linux.
+      Use it as-is for automation and testing, or read the source to
+      see how easy it is to build your own with xa11y.
+    </p>
+    <div class="hero-actions">
+      <a class="btn-primary" href="#install">Install</a>
+      <a class="btn-ghost" href="https://xa11y.dev">xa11y — the library behind this →</a>
     </div>
-    <div class="toc-group">
-      <h5>Reference</h5>
-      <a href="#example">Example</a>
-      <a href="#how">How it works</a>
-      <a href="#commands">Commands</a>
-      <a href="#selectors">Selectors</a>
+    <div class="meta-row">
+      <span class="chip">macOS · Linux · Windows</span>
+      <span class="chip">MIT licensed</span>
+      <span class="chip">Rust · Python · JavaScript</span>
     </div>
-    <div class="toc-group">
-      <h5>Platform</h5>
-      <a href="#platforms">Platforms</a>
-      <a href="#license">License</a>
+  </section>
+
+  <!-- ── DEMO ── -->
+  <section class="section" id="how-it-works">
+    <h2>What it looks like</h2>
+    <pre class="code"><code><span class="c"># list running apps</span>
+agent-desktop apps
+
+<span class="c"># read the accessibility tree</span>
+agent-desktop tree --app Safari
+
+<span class="c"># find elements with CSS-like selectors</span>
+agent-desktop find <span class="s">"button[name='New Tab']"</span> --app Safari
+
+<span class="c"># interact</span>
+agent-desktop action press <span class="s">"button[name='New Tab']"</span> --app Safari
+agent-desktop action type-text <span class="s">"text_field[name='Address']"</span> --app Safari --value <span class="s">"xa11y.dev"</span>
+
+<span class="c"># screenshot any app or element</span>
+agent-desktop screenshot --app Safari --output screen.png</code></pre>
+
+    <div class="mcp-note">
+      <span class="mcp-label">MCP</span>
+      All commands are also exposed as MCP tools — drop agent-desktop into any MCP-compatible agent framework with one config line.
     </div>
-  </aside>
+  </section>
 
-  <main id="top">
+  <!-- ── BUILT ON XA11Y ── -->
+  <section class="section xa11y-section" id="built-on">
+    <h2>Built on xa11y</h2>
+    <p class="section-sub">
+      agent-desktop is a thin layer over <a href="https://xa11y.dev">xa11y</a> — a Playwright-style library for
+      driving native apps via OS accessibility APIs. One unified API for
+      AXUIElement (macOS), UI Automation (Windows), and AT-SPI2 (Linux).
+      The same agent-desktop logic fits in ~50 lines in any supported language.
+    </p>
 
-    <div class="lede">
-      <h1>Observe and interact with any UI, <em>from the command line.</em></h1>
-      <p class="sub">
-        A desktop automation CLI designed for AI agents. Reads the OS accessibility tree,
-        targets elements with CSS-like selectors, and exposes click, type, scroll, and screenshot
-        as shell commands. macOS, Linux, and Windows. Native Rust, single binary.
-      </p>
-      <div class="meta-row">
-        <span class="chip">macOS · Linux · Windows</span>
+    <div class="tabs" id="lang-tabs">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-lang="rust">Rust</button>
+        <button class="tab-btn" data-lang="python">Python</button>
+        <button class="tab-btn" data-lang="js">JavaScript</button>
+      </div>
 
-        <span class="chip">MIT licensed</span>
+      <div class="tab-panel active" data-lang="rust"><pre class="code code-tab"><code><span class="c">// cargo add xa11y</span>
+<span class="k">use</span> xa11y::{App, InputSim};
+
+<span class="k">async fn</span> <span class="p">run</span>() -> xa11y::Result<()> {
+    <span class="c">// connect to any running app by name</span>
+    <span class="k">let</span> app = App::by_name(<span class="s">"Safari"</span>)?;
+
+    <span class="c">// CSS-like selectors, auto-waits for visible + enabled</span>
+    <span class="k">let</span> locator = app.locator(<span class="s">"button[name='New Tab']"</span>);
+    locator.press().<span class="k">await</span>?;
+
+    <span class="c">// screenshot any element or region</span>
+    <span class="k">let</span> shot = app.screenshot(None).<span class="k">await</span>?;
+    shot.save_png(<span class="s">"screen.png"</span>)?;
+    <span class="k">Ok</span>(())
+}</code></pre></div>
+
+      <div class="tab-panel" data-lang="python"><pre class="code code-tab"><code><span class="c"># pip install xa11y</span>
+<span class="k">from</span> xa11y <span class="k">import</span> App
+
+<span class="c"># connect to any running app by name</span>
+app = App.by_name(<span class="s">"Safari"</span>)
+
+<span class="c"># CSS-like selectors, auto-waits for visible + enabled</span>
+locator = app.locator(<span class="s">"button[name='New Tab']"</span>)
+locator.press()
+
+<span class="c"># screenshot any element or region</span>
+shot = app.screenshot()
+shot.save_png(<span class="s">"screen.png"</span>)</code></pre></div>
+
+      <div class="tab-panel" data-lang="js"><pre class="code code-tab"><code><span class="c">// npm install @crowecawcaw/xa11y</span>
+<span class="k">import</span> { App } <span class="k">from</span> <span class="s">'@crowecawcaw/xa11y'</span>;
+
+<span class="c">// connect to any running app by name</span>
+<span class="k">const</span> app = <span class="k">await</span> App.byName(<span class="s">'Safari'</span>);
+
+<span class="c">// CSS-like selectors, auto-waits for visible + enabled</span>
+<span class="k">const</span> locator = app.locator(<span class="s">"button[name='New Tab']"</span>);
+<span class="k">await</span> locator.press();
+
+<span class="c">// screenshot any element or region</span>
+<span class="k">const</span> shot = <span class="k">await</span> app.screenshot();
+<span class="k">await</span> shot.savePng(<span class="s">'screen.png'</span>);</code></pre></div>
+    </div>
+
+    <div class="xa11y-links">
+      <a href="https://xa11y.dev/guides/quick-start/" class="xa11y-link-item">
+        <span class="xlink-label">Quick start</span>
+        <span class="xlink-desc">Build your own tool with xa11y →</span>
+      </a>
+      <a href="https://github.com/crowecawcaw/agent-desktop" class="xa11y-link-item">
+        <span class="xlink-label">Source</span>
+        <span class="xlink-desc">Read the agent-desktop implementation →</span>
+      </a>
+      <a href="https://xa11y.dev/guides/desktop-testing/" class="xa11y-link-item">
+        <span class="xlink-label">Testing</span>
+        <span class="xlink-desc">Desktop testing guide on xa11y.dev →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── FORK ── -->
+  <section class="section" id="choose">
+    <h2>Where to go from here</h2>
+    <div class="fork-grid">
+      <div class="fork-card">
+        <div class="fork-icon">↓</div>
+        <h3>Use agent-desktop</h3>
+        <p>Install the CLI or add the MCP server to your agent stack. Works out of the box on macOS, Windows, and Linux.</p>
+        <a href="#install" class="fork-link">Install →</a>
+      </div>
+      <div class="fork-card fork-card--accent">
+        <div class="fork-icon">⬡</div>
+        <h3>Build your own with xa11y</h3>
+        <p>Use agent-desktop as a reference and xa11y as your foundation. Rust, Python, or JavaScript bindings available.</p>
+        <a href="https://xa11y.dev" class="fork-link">xa11y.dev →</a>
+      </div>
+      <div class="fork-card">
+        <div class="fork-icon">✓</div>
+        <h3>Desktop testing</h3>
+        <p>Looking for a cross-platform desktop testing framework? xa11y has a dedicated testing guide with CI setup for all three platforms.</p>
+        <a href="https://xa11y.dev/guides/desktop-testing/" class="fork-link">Testing guide →</a>
       </div>
     </div>
+  </section>
 
-    <section id="install">
-      <h2>Install</h2>
-      <pre class="code"><code><span class="c"># via cargo</span>
+  <!-- ── INSTALL ── -->
+  <section class="section" id="install">
+    <h2>Install</h2>
+    <pre class="code"><code><span class="c"># via cargo (Rust)</span>
 cargo install agent-desktop
 
 <span class="c"># verify</span>
 agent-desktop --version</code></pre>
-    </section>
 
-    <section id="usage">
-      <h2>Usage</h2>
-      <p>Add the following to your agent's system prompt or instructions:</p>
-      <div class="prompt-block">
-        <div class="prompt-label">Prompt</div>
-        <div class="prompt-body">You have access to <code>agent-desktop</code>, a CLI for desktop automation via accessibility APIs. Run <code>agent-desktop --help</code> to see available commands. Use it to observe, click, type, scroll, and screenshot any application on the user's desktop. Start by observing the screen to understand what's visible, then interact with elements using their IDs or CSS-like selectors.</div>
-      </div>
-    </section>
+    <p class="install-note">
+      Pre-built binaries for macOS, Linux, and Windows via
+      <a href="https://github.com/crowecawcaw/agent-desktop/releases">GitHub Releases</a>.
+      MCP server config: see <a href="https://github.com/crowecawcaw/agent-desktop#mcp">README</a>.
+    </p>
+  </section>
 
-    <section id="example">
-      <h2>Example</h2>
-      <pre class="code"><code><span class="c"># List all running apps</span>
-agent-desktop observe
+</main>
 
-<span class="c"># Get the accessibility tree for a specific app</span>
-agent-desktop observe --app Safari
-
-<span class="c"># Filter with CSS-like selectors</span>
-agent-desktop observe --app Safari --query 'button[name="OK"]'
-
-<span class="c"># Interact</span>
-agent-desktop click --app Safari --query 'button[name="OK"]'
-agent-desktop type --text "hello world"
-agent-desktop screenshot --output /tmp/screen.png</code></pre>
-    </section>
-
-    <section id="how">
-      <h2>How it works</h2>
-      <ol>
-        <li><code>observe</code> — query the accessibility tree, get structured element data back.</li>
-        <li>Use element IDs or selectors to click, type, scroll, or send a keystroke.</li>
-        <li>Re-observe after each action to get updated state.</li>
-      </ol>
-    </section>
-
-    <section id="commands">
-      <h2>Commands</h2>
-      <div class="cmd-table">
-        <div class="cmd-row"><code>observe</code><div class="desc">List apps, read the accessibility tree, filter with selectors, show role distribution.</div></div>
-        <div class="cmd-row"><code>click</code><div class="desc">By element, selector, or absolute coordinates.</div></div>
-        <div class="cmd-row"><code>type</code><div class="desc">At cursor, or into a specific element via <code>--query</code>.</div></div>
-        <div class="cmd-row"><code>scroll</code><div class="desc">Direction, amount, target element.</div></div>
-        <div class="cmd-row"><code>key</code><div class="desc">Single key or combo, e.g. <code>cmd+n</code>.</div></div>
-        <div class="cmd-row"><code>focus</code><div class="desc">Bring an app to the foreground.</div></div>
-        <div class="cmd-row"><code>read</code><div class="desc">Element text or value; also the system clipboard.</div></div>
-        <div class="cmd-row"><code>wait</code><div class="desc">Block until a selector resolves.</div></div>
-        <div class="cmd-row"><code>interact</code><div class="desc">Invoke a native accessibility action directly.</div></div>
-        <div class="cmd-row"><code>screenshot</code><div class="desc">Write a PNG to disk.</div></div>
-      </div>
-    </section>
-
-    <section id="selectors">
-      <h2>Selectors</h2>
-      <p>The <code>--query</code> flag accepts CSS-like selectors for targeting elements in the accessibility tree.</p>
-
-      <h3>By role</h3>
-      <pre class="code"><code>agent-desktop observe --app Safari --query 'button'
-agent-desktop observe --app Safari --query 'text_field'
-agent-desktop observe --app Safari --query 'menu_item'</code></pre>
-
-      <h3>By attribute</h3>
-      <p>Supported attributes: <code>name</code>, <code>value</code>, <code>description</code>, <code>role</code>.</p>
-      <div class="cmd-table">
-        <div class="cmd-row"><code>[name="Submit"]</code><div class="desc">Exact match on name.</div></div>
-        <div class="cmd-row"><code>[name*="addr"]</code><div class="desc">Substring match (case-insensitive).</div></div>
-        <div class="cmd-row"><code>[name^="addr"]</code><div class="desc">Starts-with match (case-insensitive).</div></div>
-        <div class="cmd-row"><code>[value="foo"]</code><div class="desc">Match by value attribute.</div></div>
-      </div>
-
-      <h3>Combinators</h3>
-      <div class="cmd-table" style="margin-bottom: 16px;">
-        <div class="cmd-row"><code>toolbar > text_field</code><div class="desc">Direct child — text_field must be an immediate child of toolbar.</div></div>
-        <div class="cmd-row"><code>toolbar text_field</code><div class="desc">Descendant — text_field anywhere inside toolbar.</div></div>
-      </div>
-
-      <h3>Nth matching</h3>
-      <pre class="code"><code><span class="c"># Click the 2nd button (1-based index)</span>
-agent-desktop click --app Safari --query 'button:nth(2)'</code></pre>
-
-      <h3>Combined</h3>
-      <pre class="code"><code><span class="c"># Text field named "Address" inside a toolbar</span>
-agent-desktop observe --app Safari --query 'toolbar > text_field[name*="Address"]'
-
-<span class="c"># 3rd menu item with "File" in the name</span>
-agent-desktop click --app Finder --query 'menu_item[name^="File"]:nth(3)'</code></pre>
-    </section>
-
-    <section id="platforms">
-      <h2>Platforms</h2>
-      <div class="platforms">
-        <div class="plat">
-          <div class="pname">macOS</div>
-          <div class="parch">arm64 · x64</div>
-          <div class="papi">Accessibility API: <span>AXUIElement</span></div>
-        </div>
-        <div class="plat">
-          <div class="pname">Linux</div>
-          <div class="parch">x64</div>
-          <div class="papi">Accessibility API: <span>AT-SPI2 via D-Bus</span></div>
-        </div>
-        <div class="plat">
-          <div class="pname">Windows</div>
-          <div class="parch">x64</div>
-          <div class="papi">Accessibility API: <span>UI Automation</span></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="license">
-      <h2>License</h2>
-      <p>MIT. Source on <a href="https://github.com/crowecawcaw/agent-desktop">GitHub</a>.</p>
-    </section>
-
-  </main>
-</div>
-
-<footer>
-  <span>agent-desktop</span>
-  <span class="sep">·</span>
-  <a href="https://github.com/crowecawcaw/agent-desktop">GitHub</a>
-  <span class="spacer"></span>
-  <span>MIT</span>
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-name">agent-desktop</span>
+    <span class="sep">·</span>
+    <a href="https://github.com/crowecawcaw/agent-desktop">GitHub</a>
+    <span class="sep">·</span>
+    <span>MIT</span>
+    <span class="spacer"></span>
+    <span class="footer-xa11y">Powered by <a href="https://xa11y.dev">xa11y</a></span>
+  </div>
 </footer>
 
 <script>
-  // TOC active-section tracking
-  const tocLinks = Array.from(document.querySelectorAll('.toc a'));
-  const sections = tocLinks
-    .map(a => document.querySelector(a.getAttribute('href')))
-    .filter(Boolean);
-  const byId = new Map(sections.map(s => [s.id, tocLinks.find(a => a.getAttribute('href') === '#' + s.id)]));
-  const obs = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        tocLinks.forEach(a => a.classList.remove('active'));
-        const link = byId.get(e.target.id);
-        if (link) link.classList.add('active');
-      }
+  const btns = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+  btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = btn.dataset.lang;
+      btns.forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+      panels.forEach(p => p.classList.toggle('active', p.dataset.lang === lang));
     });
-  }, { rootMargin: '-40% 0px -55% 0px' });
-  sections.forEach(s => obs.observe(s));
+  });
 </script>
+
 </body>
 </html>
