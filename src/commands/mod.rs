@@ -1,6 +1,7 @@
 pub mod click;
 pub mod interact;
 pub mod key;
+pub mod mcp;
 pub mod observe;
 pub mod read;
 pub mod screenshot;

@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::state::AppState;
 
 /// Read text content from an accessibility element (name + value)
-pub fn run_read_element(element_id: u32) -> Result<()> {
+pub fn run_read_element(element_id: u32) -> Result<String> {
     let state = AppState::load()?;
     let elem = state.get_element(element_id)?;
 
@@ -22,15 +22,13 @@ pub fn run_read_element(element_id: u32) -> Result<()> {
     }
 
     let json = serde_json::to_string_pretty(&output)?;
-    println!("{}", json);
-    Ok(())
+    Ok(json)
 }
 
 /// Read clipboard contents
-pub fn run_read_clipboard() -> Result<()> {
+pub fn run_read_clipboard() -> Result<String> {
     let text = crate::platform::read_clipboard()?;
     let result = serde_json::json!({ "clipboard": text });
     let json = serde_json::to_string_pretty(&result)?;
-    println!("{}", json);
-    Ok(())
+    Ok(json)
 }

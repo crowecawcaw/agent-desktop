@@ -13,6 +13,8 @@ serde_json = "1"
 dirs = "6"
 anyhow = "1"
 xa11y = "0.7"
+base64 = "0.22"
+tempfile = "3"
 
 [features]
 e2e = []

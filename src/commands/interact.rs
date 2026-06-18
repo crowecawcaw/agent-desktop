@@ -6,16 +6,16 @@ pub fn run_interact(
     element_id: u32,
     action: &str,
     value: Option<&str>,
-) -> Result<()> {
+) -> Result<String> {
     accessibility::perform_action(element_id, action, value)?;
 
-    match value {
-        Some(v) => println!(
+    let msg = match value {
+        Some(v) => format!(
             "Performed '{}' on element {} with value '{}'",
             action, element_id, v
         ),
-        None => println!("Performed '{}' on element {}", action, element_id),
-    }
+        None => format!("Performed '{}' on element {}", action, element_id),
+    };
 
-    Ok(())
+    Ok(msg)
 }

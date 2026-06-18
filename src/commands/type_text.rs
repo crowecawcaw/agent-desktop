@@ -4,14 +4,13 @@ use crate::platform;
 use crate::platform::accessibility;
 use crate::state::AppState;
 
-pub fn run_type(element_id: Option<u32>, text: &str) -> Result<()> {
+pub fn run_type(element_id: Option<u32>, text: &str) -> Result<String> {
     // If element specified, try set-value first, fall back to click+type
     if let Some(eid) = element_id {
         // Try native set-value action first
         match accessibility::perform_action(eid, "set-value", Some(text)) {
             Ok(()) => {
-                println!("Set value '{}' on element {}", text, eid);
-                return Ok(());
+                return Ok(format!("Set value '{}' on element {}", text, eid));
             }
             Err(_) => {
                 // Fall back: click element center, then type
@@ -29,11 +28,9 @@ pub fn run_type(element_id: Option<u32>, text: &str) -> Result<()> {
         }
 
         platform::type_text(text).context("Failed to type text")?;
-        println!("Typed '{}' in element {}", text, eid);
-        return Ok(());
+        return Ok(format!("Typed '{}' in element {}", text, eid));
     }
 
     platform::type_text(text).context("Failed to type text")?;
-    println!("Typed '{}'", text);
-    Ok(())
+    Ok(format!("Typed '{}'", text))
 }

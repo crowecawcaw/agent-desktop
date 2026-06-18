@@ -9,7 +9,7 @@ pub fn run_scroll(
     element_id: Option<u32>,
     direction: &str,
     amount: Option<u32>,
-) -> Result<()> {
+) -> Result<String> {
     match direction {
         "up" | "down" | "left" | "right" => {}
         _ => anyhow::bail!(
@@ -30,11 +30,11 @@ pub fn run_scroll(
     let scroll_amount = amount.unwrap_or(DEFAULT_SCROLL_AMOUNT);
     platform::scroll(direction, scroll_amount, at)?;
 
-    if let Some(eid) = element_id {
-        println!("Scrolled {} {} clicks in element {}", direction, scroll_amount, eid);
+    let msg = if let Some(eid) = element_id {
+        format!("Scrolled {} {} clicks in element {}", direction, scroll_amount, eid)
     } else {
-        println!("Scrolled {} {} clicks", direction, scroll_amount);
-    }
+        format!("Scrolled {} {} clicks", direction, scroll_amount)
+    };
 
-    Ok(())
+    Ok(msg)
 }

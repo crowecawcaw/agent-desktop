@@ -12,7 +12,7 @@ pub fn run_wait(
     pid: Option<u32>,
     timeout_secs: u64,
     interval_ms: u64,
-) -> Result<()> {
+) -> Result<String> {
     let selector = query::parse_selector(query_str)
         .map_err(|e| anyhow::anyhow!("Invalid query: {}", e))?;
 
@@ -60,8 +60,7 @@ pub fn run_wait(
                 .filter(|e| ids.contains(&e.id))
                 .collect();
             let json = serde_json::to_string_pretty(&matched)?;
-            println!("{}", json);
-            return Ok(());
+            return Ok(json);
         }
 
         if Instant::now() + interval > deadline {

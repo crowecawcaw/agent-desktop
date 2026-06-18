@@ -9,11 +9,11 @@ pub fn run_click_element(
     element_id: u32,
     use_native_action: bool,
     offset: Option<(i32, i32)>,
-) -> Result<()> {
+) -> Result<String> {
     if use_native_action {
         // Use accessibility API's native press action
         accessibility::perform_action(element_id, "press", None)?;
-        println!("Pressed element {} via accessibility API", element_id);
+        Ok(format!("Pressed element {} via accessibility API", element_id))
     } else {
         // Simulate mouse click at element center
         let state = AppState::load()?;
@@ -34,10 +34,8 @@ pub fn run_click_element(
             x, y
         ))?;
 
-        println!("Clicked element {} at ({}, {})", element_id, x, y);
+        Ok(format!("Clicked element {} at ({}, {})", element_id, x, y))
     }
-
-    Ok(())
 }
 
 /// Parse offset string like "10,20" into (i32, i32)

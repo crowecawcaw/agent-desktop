@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::platform;
 
-pub fn run_key(name: &str, modifiers: Option<&str>) -> Result<()> {
+pub fn run_key(name: &str, modifiers: Option<&str>) -> Result<String> {
     let mods: Vec<&str> = match modifiers {
         Some(s) => s.split(',').map(|m| m.trim()).collect(),
         None => vec![],
@@ -21,11 +21,11 @@ pub fn run_key(name: &str, modifiers: Option<&str>) -> Result<()> {
 
     platform::key_press(name, &mods)?;
 
-    if mods.is_empty() {
-        println!("Pressed key '{}'", name);
+    let msg = if mods.is_empty() {
+        format!("Pressed key '{}'", name)
     } else {
-        println!("Pressed {}+{}", mods.join("+"), name);
-    }
+        format!("Pressed {}+{}", mods.join("+"), name)
+    };
 
-    Ok(())
+    Ok(msg)
 }

@@ -153,7 +153,7 @@ pub fn run_observe(
     format: &str,
     include_raw: bool,
     list_roles: bool,
-) -> Result<()> {
+) -> Result<String> {
     let all_apps = app.is_none() && pid.is_none();
     let effective_depth = max_depth.unwrap_or(if all_apps { 1 } else { 10 });
 
@@ -196,11 +196,11 @@ pub fn run_observe(
         for elem in &snapshot.elements {
             *counts.entry(elem.role_name.clone()).or_insert(0) += 1;
         }
-        println!("Roles ({} elements):", snapshot.element_count);
+        let mut out = format!("Roles ({} elements):\n", snapshot.element_count);
         for (role, count) in &counts {
-            println!("  {:20} {}", role, count);
+            out.push_str(&format!("  {:20} {}\n", role, count));
         }
-        return Ok(());
+        return Ok(out);
     }
 
     // If --query is given, filter first, then BFS-limit the results
@@ -221,7 +221,7 @@ pub fn run_observe(
             .collect();
         let truncated = total_matches > limited.len();
 
-        match format {
+        let out = match format {
             "json" => {
                 let result = serde_json::json!({
                     "app_name": snapshot.app_name,
@@ -232,27 +232,28 @@ pub fn run_observe(
                     "truncated": truncated,
                     "elements": limited,
                 });
-                let json = serde_json::to_string_pretty(&result)?;
-                println!("{}", json);
+                serde_json::to_string_pretty(&result)?
             }
             _ => {
+                let mut buf = String::new();
                 if truncated {
-                    println!(
-                        "<!-- query '{}' matched {} element(s), showing {} -->",
+                    buf.push_str(&format!(
+                        "<!-- query '{}' matched {} element(s), showing {} -->\n",
                         q, total_matches, limited.len()
-                    );
+                    ));
                 } else {
-                    println!(
-                        "<!-- query '{}' matched {} element(s) -->",
+                    buf.push_str(&format!(
+                        "<!-- query '{}' matched {} element(s) -->\n",
                         q, total_matches
-                    );
+                    ));
                 }
                 for elem in &limited {
-                    print_element_xml(elem, &snapshot.elements, "", true, None);
+                    buf.push_str(&format_element_xml(elem, &snapshot.elements, "", true, None));
                 }
+                buf
             }
-        }
-        return Ok(());
+        };
+        return Ok(out);
     }
 
     // BFS-limit output
@@ -260,14 +261,12 @@ pub fn run_observe(
     let bfs_elements = bfs_limit(&snapshot.elements, max_elements as usize);
     let truncated = bfs_elements.len() < total_elements;
 
-    match format {
-        "json" => {
-            print_json_bfs(&snapshot, &bfs_elements, total_elements, truncated);
-        }
-        _ => print_xml_bfs(&snapshot, &bfs_elements, total_elements, truncated),
-    }
+    let out = match format {
+        "json" => format_json_bfs(&snapshot, &bfs_elements, total_elements, truncated),
+        _ => format_xml_bfs(&snapshot, &bfs_elements, total_elements, truncated),
+    };
 
-    Ok(())
+    Ok(out)
 }
 
 /// Run observe silently (no output) — used by action commands with --app/--pid
@@ -296,7 +295,7 @@ pub fn run_observe_silent(app: Option<&str>, pid: Option<u32>) -> Result<()> {
 }
 
 /// Show a specific element and its subtree from the last observe state.
-pub fn run_observe_element(element_id: u32, format: &str) -> Result<()> {
+pub fn run_observe_element(element_id: u32, format: &str) -> Result<String> {
     let state = AppState::load()?;
     let snapshot = state.accessibility.as_ref().ok_or_else(|| {
         anyhow::anyhow!("No accessibility data. Run `agent-desktop observe` first.")
@@ -325,19 +324,20 @@ pub fn run_observe_element(element_id: u32, format: &str) -> Result<()> {
         anyhow::bail!("Element {} not found in last observe state", element_id);
     }
 
-    match format {
+    let out = match format {
         "json" => {
-            let json = serde_json::to_string_pretty(&subtree)?;
-            println!("{}", json);
+            serde_json::to_string_pretty(&subtree)?
         }
         _ => {
             if let Some(root) = snapshot.elements.iter().find(|e| e.id == element_id) {
-                print_element_xml(root, &snapshot.elements, "", true, None);
+                format_element_xml(root, &snapshot.elements, "", true, None)
+            } else {
+                String::new()
             }
         }
-    }
+    };
 
-    Ok(())
+    Ok(out)
 }
 
 // ---------------------------------------------------------------------------
@@ -351,32 +351,33 @@ fn xml_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-fn print_xml_bfs(
+fn format_xml_bfs(
     snapshot: &AccessibilitySnapshot,
     bfs_elements: &[BfsOutputElement],
     total_elements: usize,
     truncated: bool,
-) {
-    println!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+) -> String {
+    let mut buf = String::new();
+    buf.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 
     if truncated {
-        println!(
-            "<!-- showing {} of {} elements (BFS). Use --element <id> to expand a node -->",
+        buf.push_str(&format!(
+            "<!-- showing {} of {} elements (BFS). Use --element <id> to expand a node -->\n",
             bfs_elements.len(),
             total_elements
-        );
+        ));
     }
 
     if snapshot.pid == 0 {
-        println!("<applications count=\"{}\">", snapshot.element_count);
+        buf.push_str(&format!("<applications count=\"{}\">\n", snapshot.element_count));
     } else {
-        println!(
-            "<application name=\"{}\" pid=\"{}\" screen=\"{}x{}\">",
+        buf.push_str(&format!(
+            "<application name=\"{}\" pid=\"{}\" screen=\"{}x{}\">\n",
             xml_escape(&snapshot.app_name),
             snapshot.pid,
             snapshot.screen_width,
             snapshot.screen_height,
-        );
+        ));
     }
 
     // Build a set of included IDs and a map of summaries for BFS output
@@ -397,29 +398,32 @@ fn print_xml_bfs(
         .collect();
 
     for bfs_elem in &root_elements {
-        print_element_xml_bfs(
+        buf.push_str(&format_element_xml_bfs(
             bfs_elem.elem,
             &bfs_elems,
             &included_ids,
             &summaries,
             "  ",
-        );
+        ));
     }
 
     if snapshot.pid == 0 {
-        println!("</applications>");
+        buf.push_str("</applications>\n");
     } else {
-        println!("</application>");
+        buf.push_str("</application>\n");
     }
+
+    buf
 }
 
-fn print_element_xml_bfs(
+fn format_element_xml_bfs(
     elem: &AccessibilityElement,
     all_included: &[&AccessibilityElement],
     included_ids: &std::collections::HashSet<u32>,
     summaries: &HashMap<u32, &ChildSummary>,
     indent: &str,
-) {
+) -> String {
+    let mut buf = String::new();
     let tag = &elem.role_name;
     let mut attrs = format_element_attrs(elem);
 
@@ -446,15 +450,17 @@ fn print_element_xml_bfs(
         .collect();
 
     if children.is_empty() {
-        println!("{}<{}{} />", indent, tag, attrs);
+        buf.push_str(&format!("{}<{}{} />\n", indent, tag, attrs));
     } else {
-        println!("{}<{}{}>", indent, tag, attrs);
+        buf.push_str(&format!("{}<{}{}>\n", indent, tag, attrs));
         let child_indent = format!("{}  ", indent);
         for child in &children {
-            print_element_xml_bfs(child, all_included, included_ids, summaries, &child_indent);
+            buf.push_str(&format_element_xml_bfs(child, all_included, included_ids, summaries, &child_indent));
         }
-        println!("{}</{}>", indent, tag);
+        buf.push_str(&format!("{}</{}>\n", indent, tag));
     }
+
+    buf
 }
 
 fn format_element_attrs(elem: &AccessibilityElement) -> String {
@@ -505,14 +511,15 @@ fn format_element_attrs(elem: &AccessibilityElement) -> String {
     attrs
 }
 
-/// Legacy print for standalone element display (--element, query results)
-fn print_element_xml(
+/// Legacy format for standalone element display (--element, query results)
+fn format_element_xml(
     elem: &AccessibilityElement,
     all_elements: &[AccessibilityElement],
     indent: &str,
     _standalone: bool,
     summary: Option<&ChildSummary>,
-) {
+) -> String {
+    let mut buf = String::new();
     let tag = &elem.role_name;
     let mut attrs = format_element_attrs(elem);
 
@@ -531,27 +538,29 @@ fn print_element_xml(
         .collect();
 
     if children.is_empty() {
-        println!("{}<{}{} />", indent, tag, attrs);
+        buf.push_str(&format!("{}<{}{} />\n", indent, tag, attrs));
     } else {
-        println!("{}<{}{}>", indent, tag, attrs);
+        buf.push_str(&format!("{}<{}{}>\n", indent, tag, attrs));
         let child_indent = format!("{}  ", indent);
         for child in &children {
-            print_element_xml(child, all_elements, &child_indent, false, None);
+            buf.push_str(&format_element_xml(child, all_elements, &child_indent, false, None));
         }
-        println!("{}</{}>", indent, tag);
+        buf.push_str(&format!("{}</{}>\n", indent, tag));
     }
+
+    buf
 }
 
 // ---------------------------------------------------------------------------
 // JSON output
 // ---------------------------------------------------------------------------
 
-fn print_json_bfs(
+fn format_json_bfs(
     snapshot: &AccessibilitySnapshot,
     bfs_elements: &[BfsOutputElement],
     total_elements: usize,
     truncated: bool,
-) {
+) -> String {
     let elements_json: Vec<serde_json::Value> = bfs_elements
         .iter()
         .map(|b| {
@@ -582,8 +591,7 @@ fn print_json_bfs(
         "truncated": truncated,
         "elements": elements_json,
     });
-    let json = serde_json::to_string_pretty(&result).unwrap_or_default();
-    println!("{}", json);
+    serde_json::to_string_pretty(&result).unwrap_or_default()
 }
 
 // ---------------------------------------------------------------------------

@@ -279,6 +279,9 @@ enum Commands {
         #[arg(long, default_value = "500")]
         interval: u64,
     },
+
+    /// Start an MCP (Model Context Protocol) server over stdio
+    Mcp,
 }
 
 /// If --app/--pid is given, run an implicit observe and save state.
@@ -331,6 +334,10 @@ fn resolve_element_optional(element: Option<u32>, query: Option<&str>) -> Result
 }
 
 /// Parse key name that may contain "+" modifiers (e.g. "cmd+n" -> ("n", Some("cmd")))
+pub fn parse_key_shorthand_pub(name: &str, explicit_modifiers: Option<&str>) -> (String, Option<String>) {
+    parse_key_shorthand(name, explicit_modifiers)
+}
+
 fn parse_key_shorthand(name: &str, explicit_modifiers: Option<&str>) -> (String, Option<String>) {
     if explicit_modifiers.is_some() || !name.contains('+') {
         return (name.to_string(), explicit_modifiers.map(|s| s.to_string()));
@@ -359,9 +366,10 @@ fn main() -> Result<()> {
             raw,
         } => {
             if let Some(eid) = element {
-                commands::observe::run_observe_element(eid, &format)?;
+                let out = commands::observe::run_observe_element(eid, &format)?;
+                print!("{}", out);
             } else {
-                commands::observe::run_observe(
+                let out = commands::observe::run_observe(
                     app.as_deref(),
                     pid,
                     max_depth,
@@ -373,6 +381,7 @@ fn main() -> Result<()> {
                     raw,
                     list_roles,
                 )?;
+                print!("{}", out);
             }
         }
         Commands::Interact {
@@ -385,10 +394,12 @@ fn main() -> Result<()> {
         } => {
             ensure_app_observed(app.as_deref(), pid)?;
             let eid = resolve_element(element, query.as_deref())?;
-            commands::interact::run_interact(eid, &action, value.as_deref())?;
+            let out = commands::interact::run_interact(eid, &action, value.as_deref())?;
+            println!("{}", out);
         }
         Commands::Screenshot { output, scale, app, pid } => {
-            commands::screenshot::run_screenshot(&output, scale, app.as_deref(), pid)?;
+            let out = commands::screenshot::run_screenshot(&output, scale, app.as_deref(), pid)?;
+            println!("{}", out);
         }
         Commands::Click {
             element,
@@ -418,12 +429,14 @@ fn main() -> Result<()> {
                 Some(ref s) => Some(commands::click::parse_offset(s)?),
                 None => None,
             };
-            commands::click::run_click_element(eid, action, parsed_offset)?;
+            let out = commands::click::run_click_element(eid, action, parsed_offset)?;
+            println!("{}", out);
         }
         Commands::Type { text, element, query, app, pid } => {
             ensure_app_observed(app.as_deref(), pid)?;
             let eid = resolve_element_optional(element, query.as_deref())?;
-            commands::type_text::run_type(eid, &text)?;
+            let out = commands::type_text::run_type(eid, &text)?;
+            println!("{}", out);
         }
         Commands::Scroll {
             direction,
@@ -435,14 +448,16 @@ fn main() -> Result<()> {
         } => {
             ensure_app_observed(app.as_deref(), pid)?;
             let eid = resolve_element_optional(element, query.as_deref())?;
-            commands::scroll::run_scroll(eid, &direction, amount)?;
+            let out = commands::scroll::run_scroll(eid, &direction, amount)?;
+            println!("{}", out);
         }
         Commands::Key { name, modifiers, app, pid } => {
             if app.is_some() || pid.is_some() {
                 platform::focus_app(app.as_deref(), pid)?;
             }
             let (key, mods) = parse_key_shorthand(&name, modifiers.as_deref());
-            commands::key::run_key(&key, mods.as_deref())?;
+            let out = commands::key::run_key(&key, mods.as_deref())?;
+            println!("{}", out);
         }
         Commands::Focus { app, pid, element, query } => {
             if app.is_some() || pid.is_some() {
@@ -457,25 +472,32 @@ fn main() -> Result<()> {
             }
             if element.is_some() || query.is_some() {
                 let eid = resolve_element(element, query.as_deref())?;
-                commands::interact::run_interact(eid, "focus", None)?;
+                let out = commands::interact::run_interact(eid, "focus", None)?;
+                println!("{}", out);
             }
         }
         Commands::Read { element, query, clipboard } => {
             if clipboard {
-                commands::read::run_read_clipboard()?;
+                let out = commands::read::run_read_clipboard()?;
+                println!("{}", out);
             } else {
                 let eid = resolve_element(element, query.as_deref())?;
-                commands::read::run_read_element(eid)?;
+                let out = commands::read::run_read_element(eid)?;
+                println!("{}", out);
             }
         }
         Commands::Wait { query, app, pid, timeout, interval } => {
-            commands::wait::run_wait(
+            let out = commands::wait::run_wait(
                 &query,
                 app.as_deref(),
                 pid,
                 timeout,
                 interval,
             )?;
+            println!("{}", out);
+        }
+        Commands::Mcp => {
+            commands::mcp::run_mcp()?;
         }
     }
 
