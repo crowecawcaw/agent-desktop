@@ -226,6 +226,7 @@ pub fn run_observe(
                 let result = serde_json::json!({
                     "app_name": snapshot.app_name,
                     "pid": snapshot.pid,
+                    "focused_app": snapshot.focused_app,
                     "query": q,
                     "match_count": total_matches,
                     "showing": limited.len(),
@@ -369,14 +370,29 @@ fn format_xml_bfs(
     }
 
     if snapshot.pid == 0 {
-        buf.push_str(&format!("<applications count=\"{}\">\n", snapshot.element_count));
-    } else {
+        let focused_attr = snapshot
+            .focused_app
+            .as_ref()
+            .map(|n| format!(" focused_app=\"{}\"", xml_escape(n)))
+            .unwrap_or_default();
         buf.push_str(&format!(
-            "<application name=\"{}\" pid=\"{}\" screen=\"{}x{}\">\n",
+            "<applications count=\"{}\"{}>\n",
+            snapshot.element_count, focused_attr
+        ));
+    } else {
+        // `focused_app` names the frontmost app; `focused="true"` when that's this app.
+        let focused_attr = match snapshot.focused_app.as_deref() {
+            Some(name) if name == snapshot.app_name => " focused=\"true\"".to_string(),
+            Some(name) => format!(" focused_app=\"{}\"", xml_escape(name)),
+            None => String::new(),
+        };
+        buf.push_str(&format!(
+            "<application name=\"{}\" pid=\"{}\" screen=\"{}x{}\"{}>\n",
             xml_escape(&snapshot.app_name),
             snapshot.pid,
             snapshot.screen_width,
             snapshot.screen_height,
+            focused_attr,
         ));
     }
 
@@ -584,6 +600,7 @@ fn format_json_bfs(
     let result = serde_json::json!({
         "app_name": snapshot.app_name,
         "pid": snapshot.pid,
+        "focused_app": snapshot.focused_app,
         "screen_width": snapshot.screen_width,
         "screen_height": snapshot.screen_height,
         "total_elements": total_elements,

@@ -31,7 +31,8 @@ jobs:
             mutter \
             gedit \
             libatk1.0-0 \
-            libatk-bridge2.0-0
+            libatk-bridge2.0-0 \
+            libxkbcommon-dev
 
       - name: Start Xvfb, D-Bus, AT-SPI2, window manager, and GUI app
         run: |

@@ -55,6 +55,11 @@ agent-desktop observe --app Safari --query 'button[name="OK"]' # Filter with CSS
 agent-desktop observe --app Safari --list-roles                # Show role distribution
 ```
 
+The observe output also reports the foreground application: the all-apps overview
+includes a `focused_app` field/attribute naming the frontmost app, and a single-app
+snapshot is tagged `focused="true"` when that app is itself frontmost (otherwise it
+carries `focused_app` naming whichever app currently holds focus).
+
 ### Interact
 
 ```

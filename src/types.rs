@@ -231,6 +231,11 @@ pub struct AccessibilitySnapshot {
     /// Empty means no filter was applied.
     #[serde(default)]
     pub query_roles: Vec<String>,
+    /// Name of the application currently holding the system foreground/input focus,
+    /// when known. For a single-app snapshot this is set only when the observed app
+    /// is itself frontmost.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focused_app: Option<String>,
 }
 
 fn default_query_max_depth() -> u32 { 10 }
