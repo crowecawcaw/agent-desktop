@@ -1,12 +1,20 @@
 use anyhow::{Context, Result};
+use std::time::Duration;
 use xa11y::{App, AppExt, Role};
 use tempfile;
+
+/// Timeout for resolving the target app before screenshotting (xa11y 0.9 requires it explicitly).
+const APP_LOOKUP_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub fn run_screenshot(output_path: &str, scale: f64, app: Option<&str>, pid: Option<u32>) -> Result<String> {
     let shot = if app.is_some() || pid.is_some() {
         let xa_app = match (pid, app) {
-            (Some(p), _) => App::by_pid(p).map_err(|e| anyhow::anyhow!("{}", e))?,
-            (None, Some(name)) => App::by_name(name).map_err(|e| anyhow::anyhow!("{}", e))?,
+            (Some(p), _) => {
+                App::by_pid(p, APP_LOOKUP_TIMEOUT).map_err(|e| anyhow::anyhow!("{}", e))?
+            }
+            (None, Some(name)) => {
+                App::by_name(name, APP_LOOKUP_TIMEOUT).map_err(|e| anyhow::anyhow!("{}", e))?
+            }
             _ => unreachable!(),
         };
         let window = xa_app
@@ -42,8 +50,12 @@ pub fn run_screenshot(output_path: &str, scale: f64, app: Option<&str>, pid: Opt
 pub fn take_screenshot_bytes(scale: f64, app: Option<&str>, pid: Option<u32>) -> Result<Vec<u8>> {
     let shot = if app.is_some() || pid.is_some() {
         let xa_app = match (pid, app) {
-            (Some(p), _) => App::by_pid(p).map_err(|e| anyhow::anyhow!("{}", e))?,
-            (None, Some(name)) => App::by_name(name).map_err(|e| anyhow::anyhow!("{}", e))?,
+            (Some(p), _) => {
+                App::by_pid(p, APP_LOOKUP_TIMEOUT).map_err(|e| anyhow::anyhow!("{}", e))?
+            }
+            (None, Some(name)) => {
+                App::by_name(name, APP_LOOKUP_TIMEOUT).map_err(|e| anyhow::anyhow!("{}", e))?
+            }
             _ => unreachable!(),
         };
         let window = xa_app

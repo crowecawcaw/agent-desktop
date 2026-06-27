@@ -1,8 +1,13 @@
 use anyhow::Result;
 use std::sync::Mutex;
+use std::time::Duration;
 use xa11y::{App, AppExt, Element, Role};
 
 use crate::types::*;
+
+/// How long `App::by_name`/`by_pid` poll for the app to appear before giving up.
+/// xa11y 0.9 made this an explicit argument (no implicit default).
+const APP_LOOKUP_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Cached xa11y element handles keyed by the snapshot ID we assigned.
 static ELEMENT_CACHE: Mutex<Option<Vec<CachedElement>>> = Mutex::new(None);
@@ -14,10 +19,30 @@ struct CachedElement {
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
+/// Name of the application currently holding the system foreground/input focus,
+/// derived from `App::list()`. Note: on macOS `App::focused()` only reports
+/// reliably on `list()`-derived handles (not `by_name`/`by_pid` ones), so we
+/// always resolve foreground focus through the app list.
+fn focused_app_name() -> Option<String> {
+    App::list()
+        .ok()?
+        .into_iter()
+        .find(|a| a.focused())
+        .map(|a| a.name)
+        .filter(|n| !n.is_empty())
+}
+
 /// Get a shallow overview of all running applications
 pub fn get_all_apps_overview(opts: &QueryOptions) -> Result<AccessibilitySnapshot> {
     let apps = App::list().map_err(map_xa11y_error)?;
     let (screen_w, screen_h) = get_screen_size();
+
+    // Record which app currently holds the system foreground/input focus.
+    let focused_app = apps
+        .iter()
+        .find(|a| a.focused())
+        .map(|a| a.name.clone())
+        .filter(|n| !n.is_empty());
 
     let mut elements = Vec::new();
     let mut cache_entries = Vec::new();
@@ -72,6 +97,7 @@ pub fn get_all_apps_overview(opts: &QueryOptions) -> Result<AccessibilitySnapsho
                     .collect()
             })
             .unwrap_or_default(),
+        focused_app,
     })
 }
 
@@ -80,12 +106,19 @@ pub fn get_tree(target: &AppTarget, opts: &QueryOptions) -> Result<Accessibility
     check_permissions()?;
 
     let app = match target {
-        AppTarget::ByName(name) => App::by_name(name).map_err(map_xa11y_error)?,
-        AppTarget::ByPid(pid) => App::by_pid(*pid).map_err(map_xa11y_error)?,
+        AppTarget::ByName(name) => {
+            App::by_name(name, APP_LOOKUP_TIMEOUT).map_err(map_xa11y_error)?
+        }
+        AppTarget::ByPid(pid) => {
+            App::by_pid(*pid, APP_LOOKUP_TIMEOUT).map_err(map_xa11y_error)?
+        }
     };
 
     let pid = app.pid.unwrap_or(0);
     let app_name = app.name.clone();
+    // Surface which app is frontmost so the caller can tell whether the observed
+    // app holds focus (compare against `app_name`).
+    let focused_app = focused_app_name();
     let (screen_w, screen_h) = get_screen_size();
 
     let mut elements = Vec::new();
@@ -130,6 +163,7 @@ pub fn get_tree(target: &AppTarget, opts: &QueryOptions) -> Result<Accessibility
                     .collect()
             })
             .unwrap_or_default(),
+        focused_app,
     })
 }
 
